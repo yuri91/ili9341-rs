@@ -1,0 +1,7 @@
+[package]
+name = "ili9341"
+version = "0.1.0"
+authors = ["Yuri Iozzelli <y.iozzelli@gmail.com>"]
+
+[dependencies]
+embedded-hal = "0.1.0"
