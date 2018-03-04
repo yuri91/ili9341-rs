@@ -23,6 +23,13 @@ pub enum Error<E> {
     Spi(E),
 }
 
+pub enum Orientation {
+    Portrait,
+    PortraitFlipped,
+    Landscape,
+    LandscapeFlipped,
+}
+
 pub struct Ili9341<SPI, CS, DC, RESET> {
     spi: SPI,
     cs: CS,
@@ -168,31 +175,28 @@ where
         self.set_window(x0, y0, x1, y1)?;
         self.write_raw(data)
     }
-    pub fn set_rotation(&mut self, mode: u8) -> Result<(), Error<E>> {
-        match mode%4 {
-            0 => {
+    pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), Error<E>> {
+        match mode {
+            Orientation::Portrait => {
                 self.width = 240;
                 self.height = 320;
                 self.command(Command::MemoryAccessControl, &[0x40|0x08])
             },
-            1 => {
+            Orientation::Landscape => {
                 self.width = 320;
                 self.height = 240;
                 self.command(Command::MemoryAccessControl, &[0x20|0x08])
             },
-            2 => {
+            Orientation::PortraitFlipped => {
                 self.width = 240;
                 self.height = 320;
                 self.command(Command::MemoryAccessControl, &[0x80|0x08])
             },
-            3 => {
+            Orientation::LandscapeFlipped => {
                 self.width = 320;
                 self.height = 240;
                 self.command(Command::MemoryAccessControl, &[0x40|0x80|0x20|0x08])
-            }
-            _ => {
-                unreachable!();
-            }
+            },
         }
     }
     pub fn width(&self) -> usize {
