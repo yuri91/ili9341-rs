@@ -15,8 +15,8 @@ pub const MODE: Mode = Mode {
     phase: Phase::CaptureOnFirstTransition,
 };
 
-pub const WIDTH: u16 = 240;
-pub const HEIGHT: u16 = 320;
+const WIDTH: usize = 240;
+const HEIGHT: usize = 320;
 
 #[derive(Debug)]
 pub enum Error<E> {
@@ -52,8 +52,8 @@ where
             cs,
             dc,
             reset,
-            width: 240,
-            height: 320,
+            width: WIDTH,
+            height: HEIGHT,
         };
 
         ili9341.hard_reset(delay);
@@ -178,23 +178,23 @@ where
     pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), Error<E>> {
         match mode {
             Orientation::Portrait => {
-                self.width = 240;
-                self.height = 320;
+                self.width = WIDTH;
+                self.height = HEIGHT;
                 self.command(Command::MemoryAccessControl, &[0x40|0x08])
             },
             Orientation::Landscape => {
-                self.width = 320;
-                self.height = 240;
+                self.width = HEIGHT;
+                self.height = WIDTH;
                 self.command(Command::MemoryAccessControl, &[0x20|0x08])
             },
             Orientation::PortraitFlipped => {
-                self.width = 240;
-                self.height = 320;
+                self.width = WIDTH;
+                self.height = HEIGHT;
                 self.command(Command::MemoryAccessControl, &[0x80|0x08])
             },
             Orientation::LandscapeFlipped => {
-                self.width = 320;
-                self.height = 240;
+                self.width = HEIGHT;
+                self.height = WIDTH;
                 self.command(Command::MemoryAccessControl, &[0x40|0x80|0x20|0x08])
             },
         }
