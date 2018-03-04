@@ -31,10 +31,16 @@ pub enum Orientation {
     LandscapeFlipped,
 }
 
-/// There are two method for drawing to the screen: draw_raw and draw_iter.
+/// There are two method for drawing to the screen:
+/// [draw_raw](struct.Ili9341.html#method.draw_raw) and
+/// [draw_iter](struct.Ili9341.html#method.draw_iter).
+///
 /// In both cases the expected pixel format is rgb565.
+///
 /// The hardware makes it efficient to draw rectangles on the screen.
+///
 /// What happens is the following:
+///
 /// - A drawing window is prepared (with the 2 opposite corner coordinates)
 /// - The starting point for drawint is the top left corner of this window
 /// - Every pair of bytes received is intepreted as a pixel value in rgb565
@@ -179,8 +185,12 @@ where
         Ok(())
     }
     /// Draw a rectangle on the screen, represented by top-left corner (x0, y0)
-    /// and bottom-right corner (x1, y1). The border is included.
+    /// and bottom-right corner (x1, y1).
+    ///
+    /// The border is included.
+    ///
     /// This method accepts an iterator of rgb565 pixel values.
+    ///
     /// The iterator is useful to avoid wasting memory by holding a buffer for
     /// the whole screen when it is not necessary.
     pub fn draw_iter<I: IntoIterator<Item=u16>>(&mut self, x0: u16, y0: u16, x1: u16, y1: u16, data: I) -> Result<(), Error<E>> {
@@ -188,10 +198,15 @@ where
         self.write_iter(data)
     }
     /// Draw a rectangle on the screen, represented by top-left corner (x0, y0)
-    /// and bottom-right corner (x1, y1). The border is included.
+    /// and bottom-right corner (x1, y1).
+    ///
+    /// The border is included.
+    ///
     /// This method accepts a raw buffer of bytes that will be copied to the screen
-    /// video memory. The expected format is rgb565, and the two bytes for a pixel
-    /// are in little endian order.
+    /// video memory.
+    ///
+    /// The expected format is rgb565, and the two bytes for a pixel
+    /// are in big endian order.
     pub fn draw_raw(&mut self, x0: u16, y0: u16, x1: u16, y1: u16, data: &[u8]) -> Result<(), Error<E>> {
         self.set_window(x0, y0, x1, y1)?;
         self.write_raw(data)
