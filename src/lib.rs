@@ -2,12 +2,16 @@
 
 extern crate embedded_hal as hal;
 
+#[cfg(feature = "graphics")]
+extern crate embedded_graphics;
+
 use hal::blocking::spi;
 use hal::blocking::delay::DelayMs;
 use hal::spi::{Mode, Phase, Polarity};
 use hal::digital::OutputPin;
 
 use core::iter::IntoIterator;
+use core::fmt::Debug;
 
 /// SPI mode
 pub const MODE: Mode = Mode {
@@ -244,6 +248,30 @@ where
     pub fn height(&self) -> usize {
         self.height
     }
+}
+
+#[cfg(feature = "graphics")]
+use embedded_graphics::Drawing;
+#[cfg(feature = "graphics")]
+use embedded_graphics::drawable;
+
+#[cfg(feature = "graphics")]
+impl<E, SPI, CS, DC, RESET>  Drawing for Ili9341<SPI, CS, DC, RESET>
+where
+    SPI: spi::Transfer<u8, Error = E> + spi::Write<u8, Error = E>,
+    CS: OutputPin,
+    DC: OutputPin,
+    RESET: OutputPin,
+    E: Debug,
+{
+    fn draw<T>(&mut self, item_pixels: T)
+        where
+            T: Iterator<Item = drawable::Pixel>,
+        {
+            for (pos, color) in item_pixels {
+                self.draw_raw(pos.0 as u16, pos.0 as u16, pos.1 as u16, pos.1 as u16, if color != 0 {&[1]} else {&[0]}).expect("Failed to communicate with device");
+            }
+        }
 }
 
 #[derive(Clone, Copy)]
