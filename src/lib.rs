@@ -65,9 +65,15 @@ where
     SPI: spi::Transfer<u8, Error = E> + spi::Write<u8, Error = E>,
     CS: OutputPin,
     DC: OutputPin,
-    RESET: OutputPin, 
+    RESET: OutputPin,
 {
-    pub fn new<DELAY: DelayMs<u16>>(spi: SPI, cs: CS, dc: DC, reset: RESET, delay: &mut DELAY) -> Result<Self, Error<E>> {
+    pub fn new<DELAY: DelayMs<u16>>(
+        spi: SPI,
+        cs: CS,
+        dc: DC,
+        reset: RESET,
+        delay: &mut DELAY,
+    ) -> Result<Self, Error<E>> {
         let mut ili9341 = Ili9341 {
             spi,
             cs,
@@ -141,15 +147,19 @@ where
         self.cs.set_high();
         Ok(())
     }
-    fn write_iter<I: IntoIterator<Item=u16>>(&mut self, data: I) -> Result<(), Error<E>> {
+    fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result<(), Error<E>> {
         self.cs.set_low();
 
         self.dc.set_low();
-        self.spi.write(&[Command::MemoryWrite as u8]).map_err(Error::Spi)?;
+        self.spi
+            .write(&[Command::MemoryWrite as u8])
+            .map_err(Error::Spi)?;
 
         self.dc.set_high();
         for d in data.into_iter() {
-            self.spi.write(&[(d>>8) as u8, (d&0xff) as u8]).map_err(Error::Spi)?;
+            self.spi
+                .write(&[(d >> 8) as u8, (d & 0xff) as u8])
+                .map_err(Error::Spi)?;
         }
 
         self.cs.set_high();
@@ -159,7 +169,9 @@ where
         self.cs.set_low();
 
         self.dc.set_low();
-        self.spi.write(&[Command::MemoryWrite as u8]).map_err(Error::Spi)?;
+        self.spi
+            .write(&[Command::MemoryWrite as u8])
+            .map_err(Error::Spi)?;
 
         self.dc.set_high();
         self.spi.write(data).map_err(Error::Spi)?;
@@ -197,7 +209,14 @@ where
     ///
     /// The iterator is useful to avoid wasting memory by holding a buffer for
     /// the whole screen when it is not necessary.
-    pub fn draw_iter<I: IntoIterator<Item=u16>>(&mut self, x0: u16, y0: u16, x1: u16, y1: u16, data: I) -> Result<(), Error<E>> {
+    pub fn draw_iter<I: IntoIterator<Item = u16>>(
+        &mut self,
+        x0: u16,
+        y0: u16,
+        x1: u16,
+        y1: u16,
+        data: I,
+    ) -> Result<(), Error<E>> {
         self.set_window(x0, y0, x1, y1)?;
         self.write_iter(data)
     }
@@ -211,7 +230,14 @@ where
     ///
     /// The expected format is rgb565, and the two bytes for a pixel
     /// are in big endian order.
-    pub fn draw_raw(&mut self, x0: u16, y0: u16, x1: u16, y1: u16, data: &[u8]) -> Result<(), Error<E>> {
+    pub fn draw_raw(
+        &mut self,
+        x0: u16,
+        y0: u16,
+        x1: u16,
+        y1: u16,
+        data: &[u8],
+    ) -> Result<(), Error<E>> {
         self.set_window(x0, y0, x1, y1)?;
         self.write_raw(data)
     }
@@ -221,23 +247,23 @@ where
             Orientation::Portrait => {
                 self.width = WIDTH;
                 self.height = HEIGHT;
-                self.command(Command::MemoryAccessControl, &[0x40|0x08])
-            },
+                self.command(Command::MemoryAccessControl, &[0x40 | 0x08])
+            }
             Orientation::Landscape => {
                 self.width = HEIGHT;
                 self.height = WIDTH;
-                self.command(Command::MemoryAccessControl, &[0x20|0x08])
-            },
+                self.command(Command::MemoryAccessControl, &[0x20 | 0x08])
+            }
             Orientation::PortraitFlipped => {
                 self.width = WIDTH;
                 self.height = HEIGHT;
-                self.command(Command::MemoryAccessControl, &[0x80|0x08])
-            },
+                self.command(Command::MemoryAccessControl, &[0x80 | 0x08])
+            }
             Orientation::LandscapeFlipped => {
                 self.width = HEIGHT;
                 self.height = WIDTH;
-                self.command(Command::MemoryAccessControl, &[0x40|0x80|0x20|0x08])
-            },
+                self.command(Command::MemoryAccessControl, &[0x40 | 0x80 | 0x20 | 0x08])
+            }
         }
     }
     /// Get the current screen width. It can change based on the current orientation
@@ -256,7 +282,7 @@ use embedded_graphics::Drawing;
 use embedded_graphics::drawable;
 
 #[cfg(feature = "graphics")]
-impl<E, SPI, CS, DC, RESET>  Drawing for Ili9341<SPI, CS, DC, RESET>
+impl<E, SPI, CS, DC, RESET> Drawing for Ili9341<SPI, CS, DC, RESET>
 where
     SPI: spi::Transfer<u8, Error = E> + spi::Write<u8, Error = E>,
     CS: OutputPin,
@@ -265,13 +291,19 @@ where
     E: Debug,
 {
     fn draw<T>(&mut self, item_pixels: T)
-        where
-            T: Iterator<Item = drawable::Pixel>,
-        {
-            for (pos, color) in item_pixels {
-                self.draw_raw(pos.0 as u16, pos.0 as u16, pos.1 as u16, pos.1 as u16, if color != 0 {&[1]} else {&[0]}).expect("Failed to communicate with device");
-            }
+    where
+        T: Iterator<Item = drawable::Pixel>,
+    {
+        for (pos, color) in item_pixels {
+            self.draw_raw(
+                pos.0 as u16,
+                pos.0 as u16,
+                pos.1 as u16,
+                pos.1 as u16,
+                if color != 0 { &[1] } else { &[0] },
+            ).expect("Failed to communicate with device");
         }
+    }
 }
 
 #[derive(Clone, Copy)]
