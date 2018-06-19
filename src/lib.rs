@@ -297,8 +297,8 @@ where
         for (pos, color) in item_pixels {
             self.draw_raw(
                 pos.0 as u16,
-                pos.0 as u16,
                 pos.1 as u16,
+                pos.0 as u16,
                 pos.1 as u16,
                 if color != 0 { &[1] } else { &[0] },
             ).expect("Failed to communicate with device");

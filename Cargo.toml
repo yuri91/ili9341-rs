@@ -1,6 +1,6 @@
 [package]
 name = "ili9341"
-version = "0.1.5"
+version = "0.1.6"
 description = "A platform agnostic driver to interface with the ILI9341 (ald ILI9340C) TFT LCD display"
 authors = ["Yuri Iozzelli <y.iozzelli@gmail.com>"]
 categories = ["embedded", "hardware-support", "no-std"]
