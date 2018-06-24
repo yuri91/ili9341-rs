@@ -300,7 +300,7 @@ where
                 pos.1 as u16,
                 pos.0 as u16,
                 pos.1 as u16,
-                if color != 0 { &[1] } else { &[0] },
+                if color == 0 { &[0xff,0xff] } else { &[0,0] },
             ).expect("Failed to communicate with device");
         }
     }
