@@ -1,6 +1,6 @@
 # `ili9341`
 
-> A platform agnostic driver to interface with the ILI9341 (ald ILI9340C) TFT
+> A platform agnostic driver to interface with the ILI9341 (and ILI9340C) TFT
 > LCD display
 
 ## What works
