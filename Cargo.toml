@@ -10,7 +10,7 @@ repository = "https://github.com/yuri91/ili9341-rs"
 
 
 [dependencies]
-embedded-hal = "0.2.1"
+embedded-hal = "0.2.2"
 
 [dependencies.embedded-graphics]
 optional = true
