@@ -277,12 +277,12 @@ where
 }
 
 #[cfg(feature = "graphics")]
-use embedded_graphics::Drawing;
-#[cfg(feature = "graphics")]
 use embedded_graphics::drawable;
+#[cfg(feature = "graphics")]
+use embedded_graphics::{drawable::Pixel, pixelcolor::PixelColorU16, Drawing};
 
 #[cfg(feature = "graphics")]
-impl<E, SPI, CS, DC, RESET> Drawing for Ili9341<SPI, CS, DC, RESET>
+impl<E, SPI, CS, DC, RESET> Drawing<PixelColorU16> for Ili9341<SPI, CS, DC, RESET>
 where
     SPI: spi::Transfer<u8, Error = E> + spi::Write<u8, Error = E>,
     CS: OutputPin,
@@ -292,16 +292,21 @@ where
 {
     fn draw<T>(&mut self, item_pixels: T)
     where
-        T: Iterator<Item = drawable::Pixel>,
+        T: Iterator<Item = drawable::Pixel<PixelColorU16>>,
     {
-        for (pos, color) in item_pixels {
+        for Pixel(pos, color) in item_pixels {
             self.draw_raw(
                 pos.0 as u16,
                 pos.1 as u16,
                 pos.0 as u16,
                 pos.1 as u16,
-                if color == 0 { &[0xff,0xff] } else { &[0,0] },
-            ).expect("Failed to communicate with device");
+                if color == PixelColorU16(0) {
+                    &[0xff, 0xff]
+                } else {
+                    &[0, 0]
+                },
+            )
+            .expect("Failed to communicate with device");
         }
     }
 }
