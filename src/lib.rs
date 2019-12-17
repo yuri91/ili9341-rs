@@ -295,16 +295,16 @@ where
         T: IntoIterator<Item = drawable::Pixel<Rgb565>>,
     {
         for Pixel(pos, color) in item_pixels {
+            use embedded_graphics::pixelcolor::raw::RawData;
+
             self.draw_raw(
                 pos.x as u16,
                 pos.y as u16,
                 pos.x as u16,
                 pos.y as u16,
-                if color == Rgb565::new(0, 0, 0) {
-                    &[0xff, 0xff]
-                } else {
-                    &[0, 0]
-                },
+                &embedded_graphics::pixelcolor::raw::RawU16::from(color)
+                    .into_inner()
+                    .to_le_bytes(),
             )
             .expect("Failed to communicate with device");
         }
