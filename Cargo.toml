@@ -14,7 +14,7 @@ embedded-hal = "0.2.2"
 
 [dependencies.embedded-graphics]
 optional = true
-version = "0.4.7"
+version = "0.6.0-alpha.2"
 
 [features]
 default = ["graphics"]

@@ -5,13 +5,13 @@ extern crate embedded_hal as hal;
 #[cfg(feature = "graphics")]
 extern crate embedded_graphics;
 
-use hal::blocking::spi;
 use hal::blocking::delay::DelayMs;
-use hal::spi::{Mode, Phase, Polarity};
+use hal::blocking::spi;
 use hal::digital::OutputPin;
+use hal::spi::{Mode, Phase, Polarity};
 
-use core::iter::IntoIterator;
 use core::fmt::Debug;
+use core::iter::IntoIterator;
 
 /// SPI mode
 pub const MODE: Mode = Mode {
@@ -279,10 +279,10 @@ where
 #[cfg(feature = "graphics")]
 use embedded_graphics::drawable;
 #[cfg(feature = "graphics")]
-use embedded_graphics::{drawable::Pixel, pixelcolor::PixelColorU16, Drawing};
+use embedded_graphics::{drawable::Pixel, pixelcolor::Rgb565, Drawing};
 
 #[cfg(feature = "graphics")]
-impl<E, SPI, CS, DC, RESET> Drawing<PixelColorU16> for Ili9341<SPI, CS, DC, RESET>
+impl<E, SPI, CS, DC, RESET> Drawing<Rgb565> for Ili9341<SPI, CS, DC, RESET>
 where
     SPI: spi::Transfer<u8, Error = E> + spi::Write<u8, Error = E>,
     CS: OutputPin,
@@ -292,19 +292,19 @@ where
 {
     fn draw<T>(&mut self, item_pixels: T)
     where
-        T: Iterator<Item = drawable::Pixel<PixelColorU16>>,
+        T: IntoIterator<Item = drawable::Pixel<Rgb565>>,
     {
         for Pixel(pos, color) in item_pixels {
+            use embedded_graphics::pixelcolor::raw::RawData;
+
             self.draw_raw(
-                pos.0 as u16,
-                pos.1 as u16,
-                pos.0 as u16,
-                pos.1 as u16,
-                if color == PixelColorU16(0) {
-                    &[0xff, 0xff]
-                } else {
-                    &[0, 0]
-                },
+                pos.x as u16,
+                pos.y as u16,
+                pos.x as u16,
+                pos.y as u16,
+                &embedded_graphics::pixelcolor::raw::RawU16::from(color)
+                    .into_inner()
+                    .to_le_bytes(),
             )
             .expect("Failed to communicate with device");
         }
