@@ -7,7 +7,7 @@ extern crate embedded_graphics;
 
 use hal::blocking::delay::DelayMs;
 use hal::blocking::spi;
-use hal::digital::OutputPin;
+use hal::digital::v2::OutputPin;
 use hal::spi::{Mode, Phase, Polarity};
 
 use core::fmt::Debug;
@@ -23,8 +23,9 @@ const WIDTH: usize = 240;
 const HEIGHT: usize = 320;
 
 #[derive(Debug)]
-pub enum Error<E> {
-    Spi(E),
+pub enum Error<SpiE, PinE> {
+    Spi(SpiE),
+    OutputPin(PinE)
 }
 
 /// The default orientation is Portrait
@@ -60,20 +61,21 @@ pub struct Ili9341<SPI, CS, DC, RESET> {
     height: usize,
 }
 
-impl<E, SPI, CS, DC, RESET> Ili9341<SPI, CS, DC, RESET>
+impl<SpiE, PinE, SPI, CS, DC, RESET> Ili9341<SPI, CS, DC, RESET>
 where
-    SPI: spi::Transfer<u8, Error = E> + spi::Write<u8, Error = E>,
-    CS: OutputPin,
-    DC: OutputPin,
-    RESET: OutputPin,
+    SPI: spi::Transfer<u8, Error = SpiE> + spi::Write<u8, Error = SpiE>,
+    CS: OutputPin<Error = PinE>,
+    DC: OutputPin<Error = PinE>,
+    RESET: OutputPin<Error = PinE>,
 {
+
     pub fn new<DELAY: DelayMs<u16>>(
         spi: SPI,
         cs: CS,
         dc: DC,
         reset: RESET,
         delay: &mut DELAY,
-    ) -> Result<Self, Error<E>> {
+    ) -> Result<Self, Error<SpiE, PinE>> {
         let mut ili9341 = Ili9341 {
             spi,
             cs,
@@ -83,7 +85,7 @@ where
             height: HEIGHT,
         };
 
-        ili9341.hard_reset(delay);
+        ili9341.hard_reset(delay)?;
         ili9341.command(Command::SoftwareReset, &[])?;
         delay.delay_ms(200);
 
@@ -124,62 +126,63 @@ where
         Ok(ili9341)
     }
 
-    fn hard_reset<DELAY: DelayMs<u16>>(&mut self, delay: &mut DELAY) {
+    fn hard_reset<DELAY: DelayMs<u16>>(&mut self, delay: &mut DELAY) -> Result<(), Error<SpiE,PinE>> {
         // set high if previously low
-        self.reset.set_high();
+        self.reset.set_high().map_err(Error::OutputPin)?;
         delay.delay_ms(200);
         // set low for reset
-        self.reset.set_low();
+        self.reset.set_low().map_err(Error::OutputPin)?;
         delay.delay_ms(200);
         // set high for normal operation
-        self.reset.set_high();
+        self.reset.set_high().map_err(Error::OutputPin)?;
         delay.delay_ms(200);
-    }
-    fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), Error<E>> {
-        self.cs.set_low();
-
-        self.dc.set_low();
-        self.spi.write(&[cmd as u8]).map_err(Error::Spi)?;
-
-        self.dc.set_high();
-        self.spi.write(args).map_err(Error::Spi)?;
-
-        self.cs.set_high();
         Ok(())
     }
-    fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result<(), Error<E>> {
-        self.cs.set_low();
+    fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), Error<SpiE, PinE>> {
+        self.cs.set_low().map_err(Error::OutputPin)?;
 
-        self.dc.set_low();
+        self.dc.set_low().map_err(Error::OutputPin)?;
+        self.spi.write(&[cmd as u8]).map_err(Error::Spi)?;
+
+        self.dc.set_high().map_err(Error::OutputPin)?;
+        self.spi.write(args).map_err(Error::Spi)?;
+
+        self.cs.set_high().map_err(Error::OutputPin)?;
+        Ok(())
+    }
+    fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result<(), Error<SpiE, PinE>> {
+        self.cs.set_low().map_err(Error::OutputPin)?;
+
+        self.dc.set_low().map_err(Error::OutputPin)?;
         self.spi
             .write(&[Command::MemoryWrite as u8])
             .map_err(Error::Spi)?;
 
-        self.dc.set_high();
+        self.dc.set_high().map_err(Error::OutputPin)?;
         for d in data.into_iter() {
             self.spi
                 .write(&[(d >> 8) as u8, (d & 0xff) as u8])
                 .map_err(Error::Spi)?;
         }
 
-        self.cs.set_high();
+        self.cs.set_high().map_err(Error::OutputPin)?;
         Ok(())
     }
-    fn write_raw(&mut self, data: &[u8]) -> Result<(), Error<E>> {
-        self.cs.set_low();
+    fn write_raw(&mut self, data: &[u8]) -> Result<(), Error<SpiE, PinE>> {
+        self.cs.set_low().map_err(Error::OutputPin)?;
 
-        self.dc.set_low();
+        self.dc.set_low().map_err(Error::OutputPin)?;
         self.spi
             .write(&[Command::MemoryWrite as u8])
             .map_err(Error::Spi)?;
 
-        self.dc.set_high();
+        self.dc.set_high().map_err(Error::OutputPin)?;
         self.spi.write(data).map_err(Error::Spi)?;
 
-        self.cs.set_high();
+        self.cs.set_high().map_err(Error::OutputPin)?;
         Ok(())
     }
-    fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result<(), Error<E>> {
+    fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result<(), Error<SpiE, PinE>> {
         self.command(
             Command::ColumnAddressSet,
             &[
@@ -216,7 +219,7 @@ where
         x1: u16,
         y1: u16,
         data: I,
-    ) -> Result<(), Error<E>> {
+    ) -> Result<(), Error<SpiE, PinE>> {
         self.set_window(x0, y0, x1, y1)?;
         self.write_iter(data)
     }
@@ -237,12 +240,12 @@ where
         x1: u16,
         y1: u16,
         data: &[u8],
-    ) -> Result<(), Error<E>> {
+    ) -> Result<(), Error<SpiE, PinE>> {
         self.set_window(x0, y0, x1, y1)?;
         self.write_raw(data)
     }
     /// Change the orientation of the screen
-    pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), Error<E>> {
+    pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), Error<SpiE, PinE>> {
         match mode {
             Orientation::Portrait => {
                 self.width = WIDTH;
@@ -282,14 +285,16 @@ use embedded_graphics::drawable;
 use embedded_graphics::{drawable::Pixel, pixelcolor::Rgb565, Drawing};
 
 #[cfg(feature = "graphics")]
-impl<E, SPI, CS, DC, RESET> Drawing<Rgb565> for Ili9341<SPI, CS, DC, RESET>
+impl<SpiE, PinE, SPI, CS, DC, RESET> Drawing<Rgb565> for Ili9341<SPI, CS, DC, RESET>
 where
-    SPI: spi::Transfer<u8, Error = E> + spi::Write<u8, Error = E>,
-    CS: OutputPin,
-    DC: OutputPin,
-    RESET: OutputPin,
-    E: Debug,
+    SPI: spi::Transfer<u8, Error = SpiE> + spi::Write<u8, Error = SpiE>,
+    CS: OutputPin<Error = PinE>,
+    DC: OutputPin<Error = PinE>,
+    RESET: OutputPin<Error = PinE>,
+    SpiE: Debug,
+    PinE: Debug,
 {
+
     fn draw<T>(&mut self, item_pixels: T)
     where
         T: IntoIterator<Item = drawable::Pixel<Rgb565>>,
@@ -304,7 +309,7 @@ where
                 pos.y as u16,
                 &embedded_graphics::pixelcolor::raw::RawU16::from(color)
                     .into_inner()
-                    .to_le_bytes(),
+                    .to_be_bytes(),
             )
             .expect("Failed to communicate with device");
         }
