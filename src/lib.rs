@@ -25,7 +25,7 @@ const HEIGHT: usize = 320;
 #[derive(Debug)]
 pub enum Error<SpiE, PinE> {
     Spi(SpiE),
-    OutputPin(PinE)
+    OutputPin(PinE),
 }
 
 /// The default orientation is Portrait
@@ -68,7 +68,6 @@ where
     DC: OutputPin<Error = PinE>,
     RESET: OutputPin<Error = PinE>,
 {
-
     pub fn new<DELAY: DelayMs<u16>>(
         spi: SPI,
         cs: CS,
@@ -126,7 +125,10 @@ where
         Ok(ili9341)
     }
 
-    fn hard_reset<DELAY: DelayMs<u16>>(&mut self, delay: &mut DELAY) -> Result<(), Error<SpiE,PinE>> {
+    fn hard_reset<DELAY: DelayMs<u16>>(
+        &mut self,
+        delay: &mut DELAY,
+    ) -> Result<(), Error<SpiE, PinE>> {
         // set high if previously low
         self.reset.set_high().map_err(Error::OutputPin)?;
         delay.delay_ms(200);
@@ -150,7 +152,10 @@ where
         self.cs.set_high().map_err(Error::OutputPin)?;
         Ok(())
     }
-    fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result<(), Error<SpiE, PinE>> {
+    fn write_iter<I: IntoIterator<Item = u16>>(
+        &mut self,
+        data: I,
+    ) -> Result<(), Error<SpiE, PinE>> {
         self.cs.set_low().map_err(Error::OutputPin)?;
 
         self.dc.set_low().map_err(Error::OutputPin)?;
@@ -294,22 +299,78 @@ where
     SpiE: Debug,
     PinE: Debug,
 {
-
     fn draw<T>(&mut self, item_pixels: T)
     where
         T: IntoIterator<Item = drawable::Pixel<Rgb565>>,
     {
-        for Pixel(pos, color) in item_pixels {
-            use embedded_graphics::pixelcolor::raw::RawData;
+        const BUF_SIZE: usize = 64;
 
-            self.draw_raw(
-                pos.x as u16,
-                pos.y as u16,
-                pos.x as u16,
-                pos.y as u16,
-                &embedded_graphics::pixelcolor::raw::RawU16::from(color)
+        let mut row: [u8; BUF_SIZE] = [0; BUF_SIZE];
+        let mut i = 0;
+        let mut lasty = 0;
+        let mut startx = 0;
+        let mut endx = 0;
+        let width = self.width as i32;
+        let height = self.height as i32;
+
+        // Filter out pixels that are off the screen
+        let on_screen_pixels = item_pixels.into_iter().filter(|drawable::Pixel(point, _)| {
+            point.x >= 0 && point.y >= 0 && point.x < width && point.y < height
+        });
+
+        for Pixel(pos, color) in on_screen_pixels {
+            use embedded_graphics::pixelcolor::raw::RawData;
+            // Check if pixel is contiguous with previous pixel
+            if i == 0 || (pos.y == lasty && (pos.x == endx + 1) && i < BUF_SIZE - 1) {
+                if i == 0 {
+                    // New line of pixels
+                    startx = pos.x;
+                }
+                // Add pixel color to buffer
+                for b in embedded_graphics::pixelcolor::raw::RawU16::from(color)
                     .into_inner()
-                    .to_be_bytes(),
+                    .to_be_bytes()
+                    .iter()
+                {
+                    row[i] = *b;
+                    i += 1;
+                }
+                lasty = pos.y;
+                endx = pos.x;
+            } else {
+                // Line of contiguous pixels has ended, so draw it now
+                self.draw_raw(
+                    startx as u16,
+                    lasty as u16,
+                    endx as u16,
+                    lasty as u16,
+                    &row[0..i],
+                )
+                .expect("Failed to communicate with device");
+
+                // Start new line of contiguous pixels
+                i = 0;
+                startx = pos.x;
+                for b in embedded_graphics::pixelcolor::raw::RawU16::from(color)
+                    .into_inner()
+                    .to_be_bytes()
+                    .iter()
+                {
+                    row[i] = *b;
+                    i += 1;
+                }
+                lasty = pos.y;
+                endx = pos.x;
+            }
+        }
+        if i > 0 {
+            // Draw remaining pixels in buffer
+            self.draw_raw(
+                startx as u16,
+                lasty as u16,
+                endx as u16,
+                lasty as u16,
+                &row[0..i],
             )
             .expect("Failed to communicate with device");
         }
