@@ -165,18 +165,22 @@ impl<SpiE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
         delay.delay_ms(200);
         Ok(())
     }
+
     fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), Error<SpiE, PinE>> {
         self.interface.write(cmd as u8, args)
     }
+
     fn write_iter<I: IntoIterator<Item = u16>>(
         &mut self,
         data: I,
     ) -> Result<(), Error<SpiE, PinE>> {
         self.interface.write_iter(Command::MemoryWrite as u8, data)
     }
+
     fn write_raw(&mut self, data: &[u8]) -> Result<(), Error<SpiE, PinE>> {
         self.interface.write(Command::MemoryWrite as u8, data)
     }
+
     fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result<(), Error<SpiE, PinE>> {
         self.command(
             Command::ColumnAddressSet,
@@ -198,6 +202,7 @@ impl<SpiE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
         )?;
         Ok(())
     }
+
     /// Draw a rectangle on the screen, represented by top-left corner (x0, y0)
     /// and bottom-right corner (x1, y1).
     ///
@@ -218,6 +223,7 @@ impl<SpiE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
         self.set_window(x0, y0, x1, y1)?;
         self.write_iter(data)
     }
+
     /// Draw a rectangle on the screen, represented by top-left corner (x0, y0)
     /// and bottom-right corner (x1, y1).
     ///
@@ -239,6 +245,7 @@ impl<SpiE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
         self.set_window(x0, y0, x1, y1)?;
         self.write_raw(data)
     }
+
     /// Change the orientation of the screen
     pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), Error<SpiE, PinE>> {
         match mode {
@@ -264,10 +271,12 @@ impl<SpiE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
             }
         }
     }
+
     /// Get the current screen width. It can change based on the current orientation
     pub fn width(&self) -> usize {
         self.width
     }
+
     /// Get the current screen heighth. It can change based on the current orientation
     pub fn height(&self) -> usize {
         self.height
