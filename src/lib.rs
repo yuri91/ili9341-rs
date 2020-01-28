@@ -304,7 +304,7 @@ where
     where
         T: IntoIterator<Item = drawable::Pixel<Rgb565>>,
     {
-        const BUF_SIZE: usize = 64;
+        const BUF_SIZE: usize = 32;
 
         let mut row: [u16; BUF_SIZE] = [0; BUF_SIZE];
         let mut i = 0;
