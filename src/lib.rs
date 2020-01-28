@@ -66,21 +66,21 @@ pub enum Orientation {
 /// - As soon as a pixel is received, an internal counter is incremented,
 ///   and the next word will fill the next pixel (the adjacent on the right, or
 ///   the first of the next row if the row ended)
-pub struct Ili9341<SPI, CS, DC, RESET> {
-    interface: SpiInterface<SPI, CS, DC>,
+pub struct Ili9341<IFACE, RESET> {
+    interface: IFACE,
     reset: RESET,
     width: usize,
     height: usize,
 }
 
-impl<SpiE, PinE, SPI, CS, DC, RESET> Ili9341<SPI, CS, DC, RESET>
+impl<SpiE, PinE, SPI, CS, DC, RESET> Ili9341<SpiInterface<SPI, CS, DC>, RESET>
 where
     SPI: Transfer<u8, Error = SpiE> + Write<u8, Error = SpiE>,
     CS: OutputPin<Error = PinE>,
     DC: OutputPin<Error = PinE>,
     RESET: OutputPin<Error = PinE>,
 {
-    pub fn new<DELAY: DelayMs<u16>>(
+    pub fn new_spi<DELAY: DelayMs<u16>>(
         spi: SPI,
         cs: CS,
         dc: DC,
@@ -88,6 +88,20 @@ where
         delay: &mut DELAY,
     ) -> Result<Self, Error<SpiE, PinE>> {
         let interface = SpiInterface::new(spi, cs, dc);
+        Self::new(interface, reset, delay)
+    }
+}
+
+impl<SpiE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
+    where
+        IFACE: Interface<Error=Error<SpiE, PinE>>,
+        RESET: OutputPin<Error = PinE>,
+{
+    pub fn new<DELAY: DelayMs<u16>>(
+        interface: IFACE,
+        reset: RESET,
+        delay: &mut DELAY,
+    ) -> Result<Self, Error<SpiE, PinE>> {
         let mut ili9341 = Ili9341 {
             interface,
             reset,
@@ -266,11 +280,9 @@ use embedded_graphics::drawable;
 use embedded_graphics::{drawable::Pixel, pixelcolor::Rgb565, Drawing};
 
 #[cfg(feature = "graphics")]
-impl<SpiE, PinE, SPI, CS, DC, RESET> Drawing<Rgb565> for Ili9341<SPI, CS, DC, RESET>
+impl<SpiE, PinE, IFACE, RESET> Drawing<Rgb565> for Ili9341<IFACE, RESET>
 where
-    SPI: Transfer<u8, Error = SpiE> + Write<u8, Error = SpiE>,
-    CS: OutputPin<Error = PinE>,
-    DC: OutputPin<Error = PinE>,
+    IFACE: Interface<Error=Error<SpiE, PinE>>,
     RESET: OutputPin<Error = PinE>,
     SpiE: Debug,
     PinE: Debug,
