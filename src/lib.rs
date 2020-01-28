@@ -186,10 +186,6 @@ impl<IfaceE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
         self.interface.write_iter(Command::MemoryWrite as u8, data)
     }
 
-    fn write_raw(&mut self, data: &[u8]) -> Result<(), IFACE::Error> {
-        self.interface.write(Command::MemoryWrite as u8, data)
-    }
-
     fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result<(), IFACE::Error> {
         self.command(
             Command::ColumnAddressSet,
@@ -238,21 +234,20 @@ impl<IfaceE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
     ///
     /// The border is included.
     ///
-    /// This method accepts a raw buffer of bytes that will be copied to the screen
+    /// This method accepts a raw buffer of words that will be copied to the screen
     /// video memory.
     ///
-    /// The expected format is rgb565, and the two bytes for a pixel
-    /// are in big endian order.
+    /// The expected format is rgb565.
     pub fn draw_raw(
         &mut self,
         x0: u16,
         y0: u16,
         x1: u16,
         y1: u16,
-        data: &[u8],
+        data: &[u16],
     ) -> Result<(), IFACE::Error> {
         self.set_window(x0, y0, x1, y1)?;
-        self.write_raw(data)
+        self.write_iter(data.iter().cloned())
     }
 
     /// Change the orientation of the screen
@@ -311,7 +306,7 @@ where
     {
         const BUF_SIZE: usize = 64;
 
-        let mut row: [u8; BUF_SIZE] = [0; BUF_SIZE];
+        let mut row: [u16; BUF_SIZE] = [0; BUF_SIZE];
         let mut i = 0;
         let mut lasty = 0;
         let mut startx = 0;
@@ -333,14 +328,8 @@ where
                     startx = pos.x;
                 }
                 // Add pixel color to buffer
-                for b in embedded_graphics::pixelcolor::raw::RawU16::from(color)
-                    .into_inner()
-                    .to_be_bytes()
-                    .iter()
-                {
-                    row[i] = *b;
-                    i += 1;
-                }
+                row[i] = embedded_graphics::pixelcolor::raw::RawU16::from(color).into_inner();
+                i += 1;
                 lasty = pos.y;
                 endx = pos.x;
             } else {
@@ -357,14 +346,8 @@ where
                 // Start new line of contiguous pixels
                 i = 0;
                 startx = pos.x;
-                for b in embedded_graphics::pixelcolor::raw::RawU16::from(color)
-                    .into_inner()
-                    .to_be_bytes()
-                    .iter()
-                {
-                    row[i] = *b;
-                    i += 1;
-                }
+                row[i] = embedded_graphics::pixelcolor::raw::RawU16::from(color).into_inner();
+                i += 1;
                 lasty = pos.y;
                 endx = pos.x;
             }
