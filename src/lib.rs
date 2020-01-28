@@ -1,13 +1,11 @@
 #![no_std]
 
-extern crate embedded_hal as hal;
-
 #[cfg(feature = "graphics")]
 extern crate embedded_graphics;
 
-use hal::blocking::delay::DelayMs;
-use hal::blocking::spi::{Write, Transfer};
-use hal::digital::v2::OutputPin;
+use embedded_hal::blocking::delay::DelayMs;
+use embedded_hal::blocking::spi::{Write, Transfer};
+use embedded_hal::digital::v2::OutputPin;
 
 use core::fmt::Debug;
 use core::iter::IntoIterator;

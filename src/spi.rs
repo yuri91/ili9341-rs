@@ -1,7 +1,7 @@
-use super::hal::blocking::spi;
-use super::hal::spi::{Mode, Phase, Polarity};
-use super::hal::digital::v2::OutputPin;
-use super::{Interface, Error};
+use embedded_hal::blocking::spi;
+use embedded_hal::spi::{Mode, Phase, Polarity};
+use embedded_hal::digital::v2::OutputPin;
+use crate::{Interface, Error};
 
 /// SPI mode
 pub const MODE: Mode = Mode {
