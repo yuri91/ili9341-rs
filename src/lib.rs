@@ -37,9 +37,15 @@ const WIDTH: usize = 240;
 const HEIGHT: usize = 320;
 
 #[derive(Debug)]
-pub enum Error<SpiE, PinE> {
-    Spi(SpiE),
+pub enum Error<IfaceE, PinE> {
+    Interface(IfaceE),
     OutputPin(PinE),
+}
+
+impl<IfaceE, PinE> From<IfaceE> for Error<IfaceE, PinE> {
+    fn from(e: IfaceE) -> Self {
+        Error::Interface(e)
+    }
 }
 
 /// The default orientation is Portrait
@@ -88,20 +94,23 @@ where
         delay: &mut DELAY,
     ) -> Result<Self, Error<SpiE, PinE>> {
         let interface = SpiInterface::new(spi, cs, dc);
-        Self::new(interface, reset, delay)
+        Self::new(interface, reset, delay).map_err(|e| match e {
+            Error::Interface(inner) => inner,
+            Error::OutputPin(inner) => Error::OutputPin(inner),
+        })
     }
 }
 
-impl<SpiE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
+impl<IfaceE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
     where
-        IFACE: Interface<Error=Error<SpiE, PinE>>,
+        IFACE: Interface<Error=IfaceE>,
         RESET: OutputPin<Error = PinE>,
 {
     pub fn new<DELAY: DelayMs<u16>>(
         interface: IFACE,
         reset: RESET,
         delay: &mut DELAY,
-    ) -> Result<Self, Error<SpiE, PinE>> {
+    ) -> Result<Self, Error<IfaceE, PinE>> {
         let mut ili9341 = Ili9341 {
             interface,
             reset,
@@ -109,7 +118,7 @@ impl<SpiE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
             height: HEIGHT,
         };
 
-        ili9341.hard_reset(delay)?;
+        ili9341.hard_reset(delay).map_err(Error::OutputPin)?;
         ili9341.command(Command::SoftwareReset, &[])?;
         delay.delay_ms(200);
 
@@ -153,35 +162,35 @@ impl<SpiE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
     fn hard_reset<DELAY: DelayMs<u16>>(
         &mut self,
         delay: &mut DELAY,
-    ) -> Result<(), Error<SpiE, PinE>> {
+    ) -> Result<(), PinE> {
         // set high if previously low
-        self.reset.set_high().map_err(Error::OutputPin)?;
+        self.reset.set_high()?;
         delay.delay_ms(200);
         // set low for reset
-        self.reset.set_low().map_err(Error::OutputPin)?;
+        self.reset.set_low()?;
         delay.delay_ms(200);
         // set high for normal operation
-        self.reset.set_high().map_err(Error::OutputPin)?;
+        self.reset.set_high()?;
         delay.delay_ms(200);
         Ok(())
     }
 
-    fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), Error<SpiE, PinE>> {
+    fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), IFACE::Error> {
         self.interface.write(cmd as u8, args)
     }
 
     fn write_iter<I: IntoIterator<Item = u16>>(
         &mut self,
         data: I,
-    ) -> Result<(), Error<SpiE, PinE>> {
+    ) -> Result<(), IFACE::Error> {
         self.interface.write_iter(Command::MemoryWrite as u8, data)
     }
 
-    fn write_raw(&mut self, data: &[u8]) -> Result<(), Error<SpiE, PinE>> {
+    fn write_raw(&mut self, data: &[u8]) -> Result<(), IFACE::Error> {
         self.interface.write(Command::MemoryWrite as u8, data)
     }
 
-    fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result<(), Error<SpiE, PinE>> {
+    fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result<(), IFACE::Error> {
         self.command(
             Command::ColumnAddressSet,
             &[
@@ -219,7 +228,7 @@ impl<SpiE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
         x1: u16,
         y1: u16,
         data: I,
-    ) -> Result<(), Error<SpiE, PinE>> {
+    ) -> Result<(), IFACE::Error> {
         self.set_window(x0, y0, x1, y1)?;
         self.write_iter(data)
     }
@@ -241,13 +250,13 @@ impl<SpiE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
         x1: u16,
         y1: u16,
         data: &[u8],
-    ) -> Result<(), Error<SpiE, PinE>> {
+    ) -> Result<(), IFACE::Error> {
         self.set_window(x0, y0, x1, y1)?;
         self.write_raw(data)
     }
 
     /// Change the orientation of the screen
-    pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), Error<SpiE, PinE>> {
+    pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), IFACE::Error> {
         match mode {
             Orientation::Portrait => {
                 self.width = WIDTH;
@@ -289,11 +298,11 @@ use embedded_graphics::drawable;
 use embedded_graphics::{drawable::Pixel, pixelcolor::Rgb565, Drawing};
 
 #[cfg(feature = "graphics")]
-impl<SpiE, PinE, IFACE, RESET> Drawing<Rgb565> for Ili9341<IFACE, RESET>
+impl<IfaceE, PinE, IFACE, RESET> Drawing<Rgb565> for Ili9341<IFACE, RESET>
 where
-    IFACE: Interface<Error=Error<SpiE, PinE>>,
+    IFACE: Interface<Error = IfaceE>,
     RESET: OutputPin<Error = PinE>,
-    SpiE: Debug,
+    IfaceE: Debug,
     PinE: Debug,
 {
     fn draw<T>(&mut self, item_pixels: T)

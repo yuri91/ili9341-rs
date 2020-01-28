@@ -41,10 +41,10 @@ impl<SPI, CS, DC, SpiE, PinE> Interface for SpiInterface<SPI, CS, DC>
         self.cs.set_low().map_err(Error::OutputPin)?;
 
         self.dc.set_low().map_err(Error::OutputPin)?;
-        self.spi.write(&[command]).map_err(Error::Spi)?;
+        self.spi.write(&[command]).map_err(Error::Interface)?;
 
         self.dc.set_high().map_err(Error::OutputPin)?;
-        self.spi.write(data).map_err(Error::Spi)?;
+        self.spi.write(data).map_err(Error::Interface)?;
 
         self.cs.set_high().map_err(Error::OutputPin)?;
         Ok(())
@@ -54,11 +54,11 @@ impl<SPI, CS, DC, SpiE, PinE> Interface for SpiInterface<SPI, CS, DC>
         self.cs.set_low().map_err(Error::OutputPin)?;
 
         self.dc.set_low().map_err(Error::OutputPin)?;
-        self.spi.write(&[command]).map_err(Error::Spi)?;
+        self.spi.write(&[command]).map_err(Error::Interface)?;
 
         self.dc.set_high().map_err(Error::OutputPin)?;
         for w in data.into_iter() {
-            self.spi.write(&w.to_be_bytes()).map_err(Error::Spi)?;
+            self.spi.write(&w.to_be_bytes()).map_err(Error::Interface)?;
         }
 
         self.cs.set_high().map_err(Error::OutputPin)?;
