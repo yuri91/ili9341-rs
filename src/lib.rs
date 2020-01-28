@@ -6,12 +6,14 @@ extern crate embedded_hal as hal;
 extern crate embedded_graphics;
 
 use hal::blocking::delay::DelayMs;
-use hal::blocking::spi;
+use hal::blocking::spi::{Write, Transfer};
 use hal::digital::v2::OutputPin;
-use hal::spi::{Mode, Phase, Polarity};
 
 use core::fmt::Debug;
 use core::iter::IntoIterator;
+
+pub mod spi;
+use spi::SpiInterface;
 
 /// Trait representing the interface to the hardware.
 ///
@@ -30,12 +32,6 @@ pub trait Interface {
     /// with 16-bit arguments
     fn write_iter(&mut self, command: u8, data: impl IntoIterator<Item = u16>) -> Result<(), Self::Error>;
 }
-
-/// SPI mode
-pub const MODE: Mode = Mode {
-    polarity: Polarity::IdleLow,
-    phase: Phase::CaptureOnFirstTransition,
-};
 
 const WIDTH: usize = 240;
 const HEIGHT: usize = 320;
@@ -71,9 +67,7 @@ pub enum Orientation {
 ///   and the next word will fill the next pixel (the adjacent on the right, or
 ///   the first of the next row if the row ended)
 pub struct Ili9341<SPI, CS, DC, RESET> {
-    spi: SPI,
-    cs: CS,
-    dc: DC,
+    interface: SpiInterface<SPI, CS, DC>,
     reset: RESET,
     width: usize,
     height: usize,
@@ -81,7 +75,7 @@ pub struct Ili9341<SPI, CS, DC, RESET> {
 
 impl<SpiE, PinE, SPI, CS, DC, RESET> Ili9341<SPI, CS, DC, RESET>
 where
-    SPI: spi::Transfer<u8, Error = SpiE> + spi::Write<u8, Error = SpiE>,
+    SPI: Transfer<u8, Error = SpiE> + Write<u8, Error = SpiE>,
     CS: OutputPin<Error = PinE>,
     DC: OutputPin<Error = PinE>,
     RESET: OutputPin<Error = PinE>,
@@ -93,10 +87,9 @@ where
         reset: RESET,
         delay: &mut DELAY,
     ) -> Result<Self, Error<SpiE, PinE>> {
+        let interface = SpiInterface::new(spi, cs, dc);
         let mut ili9341 = Ili9341 {
-            spi,
-            cs,
-            dc,
+            interface,
             reset,
             width: WIDTH,
             height: HEIGHT,
@@ -159,51 +152,16 @@ where
         Ok(())
     }
     fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), Error<SpiE, PinE>> {
-        self.cs.set_low().map_err(Error::OutputPin)?;
-
-        self.dc.set_low().map_err(Error::OutputPin)?;
-        self.spi.write(&[cmd as u8]).map_err(Error::Spi)?;
-
-        self.dc.set_high().map_err(Error::OutputPin)?;
-        self.spi.write(args).map_err(Error::Spi)?;
-
-        self.cs.set_high().map_err(Error::OutputPin)?;
-        Ok(())
+        self.interface.write(cmd as u8, args)
     }
     fn write_iter<I: IntoIterator<Item = u16>>(
         &mut self,
         data: I,
     ) -> Result<(), Error<SpiE, PinE>> {
-        self.cs.set_low().map_err(Error::OutputPin)?;
-
-        self.dc.set_low().map_err(Error::OutputPin)?;
-        self.spi
-            .write(&[Command::MemoryWrite as u8])
-            .map_err(Error::Spi)?;
-
-        self.dc.set_high().map_err(Error::OutputPin)?;
-        for d in data.into_iter() {
-            self.spi
-                .write(&[(d >> 8) as u8, (d & 0xff) as u8])
-                .map_err(Error::Spi)?;
-        }
-
-        self.cs.set_high().map_err(Error::OutputPin)?;
-        Ok(())
+        self.interface.write_iter(Command::MemoryWrite as u8, data)
     }
     fn write_raw(&mut self, data: &[u8]) -> Result<(), Error<SpiE, PinE>> {
-        self.cs.set_low().map_err(Error::OutputPin)?;
-
-        self.dc.set_low().map_err(Error::OutputPin)?;
-        self.spi
-            .write(&[Command::MemoryWrite as u8])
-            .map_err(Error::Spi)?;
-
-        self.dc.set_high().map_err(Error::OutputPin)?;
-        self.spi.write(data).map_err(Error::Spi)?;
-
-        self.cs.set_high().map_err(Error::OutputPin)?;
-        Ok(())
+        self.interface.write(Command::MemoryWrite as u8, data)
     }
     fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result<(), Error<SpiE, PinE>> {
         self.command(
@@ -310,7 +268,7 @@ use embedded_graphics::{drawable::Pixel, pixelcolor::Rgb565, Drawing};
 #[cfg(feature = "graphics")]
 impl<SpiE, PinE, SPI, CS, DC, RESET> Drawing<Rgb565> for Ili9341<SPI, CS, DC, RESET>
 where
-    SPI: spi::Transfer<u8, Error = SpiE> + spi::Write<u8, Error = SpiE>,
+    SPI: Transfer<u8, Error = SpiE> + Write<u8, Error = SpiE>,
     CS: OutputPin<Error = PinE>,
     DC: OutputPin<Error = PinE>,
     RESET: OutputPin<Error = PinE>,
