@@ -7,6 +7,7 @@ categories = ["embedded", "hardware-support", "no-std"]
 keywords = ["embedded-hal-driver", "display", "LCD"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/yuri91/ili9341-rs"
+edition = "2018"
 
 
 [dependencies]

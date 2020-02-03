@@ -1,31 +1,49 @@
 #![no_std]
 
-extern crate embedded_hal as hal;
-
 #[cfg(feature = "graphics")]
 extern crate embedded_graphics;
 
-use hal::blocking::delay::DelayMs;
-use hal::blocking::spi;
-use hal::digital::v2::OutputPin;
-use hal::spi::{Mode, Phase, Polarity};
+use embedded_hal::blocking::delay::DelayMs;
+use embedded_hal::blocking::spi::{Write, Transfer};
+use embedded_hal::digital::v2::OutputPin;
 
 use core::fmt::Debug;
 use core::iter::IntoIterator;
 
-/// SPI mode
-pub const MODE: Mode = Mode {
-    polarity: Polarity::IdleLow,
-    phase: Phase::CaptureOnFirstTransition,
-};
+pub mod spi;
+use spi::SpiInterface;
+
+/// Trait representing the interface to the hardware.
+///
+/// Intended to abstract the various buses (SPI, MPU 8/9/16-bit) from the Controller code.
+pub trait Interface {
+    type Error;
+
+    /// Sends a command with a sequence of 8-bit arguments
+    ///
+    /// Mostly used for sending configuration commands
+    fn write(&mut self, command: u8, data: &[u8]) -> Result<(), Self::Error>;
+
+    /// Sends a command with a sequence of 16-bit data words
+    ///
+    /// Mostly used for sending MemoryWrite command and other commands
+    /// with 16-bit arguments
+    fn write_iter(&mut self, command: u8, data: impl IntoIterator<Item = u16>) -> Result<(), Self::Error>;
+}
 
 const WIDTH: usize = 240;
 const HEIGHT: usize = 320;
 
 #[derive(Debug)]
-pub enum Error<SpiE, PinE> {
-    Spi(SpiE),
+pub enum Error<IfaceE, PinE> {
+    Interface(IfaceE),
     OutputPin(PinE),
+}
+
+impl<IfaceE, PinE> From<IfaceE> for Error<IfaceE, PinE> {
+    fn from(e: IfaceE) -> Self {
+        Error::Interface(e)
+    }
 }
 
 /// The default orientation is Portrait
@@ -52,39 +70,53 @@ pub enum Orientation {
 /// - As soon as a pixel is received, an internal counter is incremented,
 ///   and the next word will fill the next pixel (the adjacent on the right, or
 ///   the first of the next row if the row ended)
-pub struct Ili9341<SPI, CS, DC, RESET> {
-    spi: SPI,
-    cs: CS,
-    dc: DC,
+pub struct Ili9341<IFACE, RESET> {
+    interface: IFACE,
     reset: RESET,
     width: usize,
     height: usize,
 }
 
-impl<SpiE, PinE, SPI, CS, DC, RESET> Ili9341<SPI, CS, DC, RESET>
+impl<SpiE, PinE, SPI, CS, DC, RESET> Ili9341<SpiInterface<SPI, CS, DC>, RESET>
 where
-    SPI: spi::Transfer<u8, Error = SpiE> + spi::Write<u8, Error = SpiE>,
+    SPI: Transfer<u8, Error = SpiE> + Write<u8, Error = SpiE>,
     CS: OutputPin<Error = PinE>,
     DC: OutputPin<Error = PinE>,
     RESET: OutputPin<Error = PinE>,
 {
-    pub fn new<DELAY: DelayMs<u16>>(
+    pub fn new_spi<DELAY: DelayMs<u16>>(
         spi: SPI,
         cs: CS,
         dc: DC,
         reset: RESET,
         delay: &mut DELAY,
     ) -> Result<Self, Error<SpiE, PinE>> {
+        let interface = SpiInterface::new(spi, cs, dc);
+        Self::new(interface, reset, delay).map_err(|e| match e {
+            Error::Interface(inner) => inner,
+            Error::OutputPin(inner) => Error::OutputPin(inner),
+        })
+    }
+}
+
+impl<IfaceE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
+    where
+        IFACE: Interface<Error=IfaceE>,
+        RESET: OutputPin<Error = PinE>,
+{
+    pub fn new<DELAY: DelayMs<u16>>(
+        interface: IFACE,
+        reset: RESET,
+        delay: &mut DELAY,
+    ) -> Result<Self, Error<IfaceE, PinE>> {
         let mut ili9341 = Ili9341 {
-            spi,
-            cs,
-            dc,
+            interface,
             reset,
             width: WIDTH,
             height: HEIGHT,
         };
 
-        ili9341.hard_reset(delay)?;
+        ili9341.hard_reset(delay).map_err(Error::OutputPin)?;
         ili9341.command(Command::SoftwareReset, &[])?;
         delay.delay_ms(200);
 
@@ -128,66 +160,31 @@ where
     fn hard_reset<DELAY: DelayMs<u16>>(
         &mut self,
         delay: &mut DELAY,
-    ) -> Result<(), Error<SpiE, PinE>> {
+    ) -> Result<(), PinE> {
         // set high if previously low
-        self.reset.set_high().map_err(Error::OutputPin)?;
+        self.reset.set_high()?;
         delay.delay_ms(200);
         // set low for reset
-        self.reset.set_low().map_err(Error::OutputPin)?;
+        self.reset.set_low()?;
         delay.delay_ms(200);
         // set high for normal operation
-        self.reset.set_high().map_err(Error::OutputPin)?;
+        self.reset.set_high()?;
         delay.delay_ms(200);
         Ok(())
     }
-    fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), Error<SpiE, PinE>> {
-        self.cs.set_low().map_err(Error::OutputPin)?;
 
-        self.dc.set_low().map_err(Error::OutputPin)?;
-        self.spi.write(&[cmd as u8]).map_err(Error::Spi)?;
-
-        self.dc.set_high().map_err(Error::OutputPin)?;
-        self.spi.write(args).map_err(Error::Spi)?;
-
-        self.cs.set_high().map_err(Error::OutputPin)?;
-        Ok(())
+    fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), IFACE::Error> {
+        self.interface.write(cmd as u8, args)
     }
+
     fn write_iter<I: IntoIterator<Item = u16>>(
         &mut self,
         data: I,
-    ) -> Result<(), Error<SpiE, PinE>> {
-        self.cs.set_low().map_err(Error::OutputPin)?;
-
-        self.dc.set_low().map_err(Error::OutputPin)?;
-        self.spi
-            .write(&[Command::MemoryWrite as u8])
-            .map_err(Error::Spi)?;
-
-        self.dc.set_high().map_err(Error::OutputPin)?;
-        for d in data.into_iter() {
-            self.spi
-                .write(&[(d >> 8) as u8, (d & 0xff) as u8])
-                .map_err(Error::Spi)?;
-        }
-
-        self.cs.set_high().map_err(Error::OutputPin)?;
-        Ok(())
+    ) -> Result<(), IFACE::Error> {
+        self.interface.write_iter(Command::MemoryWrite as u8, data)
     }
-    fn write_raw(&mut self, data: &[u8]) -> Result<(), Error<SpiE, PinE>> {
-        self.cs.set_low().map_err(Error::OutputPin)?;
 
-        self.dc.set_low().map_err(Error::OutputPin)?;
-        self.spi
-            .write(&[Command::MemoryWrite as u8])
-            .map_err(Error::Spi)?;
-
-        self.dc.set_high().map_err(Error::OutputPin)?;
-        self.spi.write(data).map_err(Error::Spi)?;
-
-        self.cs.set_high().map_err(Error::OutputPin)?;
-        Ok(())
-    }
-    fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result<(), Error<SpiE, PinE>> {
+    fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result<(), IFACE::Error> {
         self.command(
             Command::ColumnAddressSet,
             &[
@@ -208,6 +205,7 @@ where
         )?;
         Ok(())
     }
+
     /// Draw a rectangle on the screen, represented by top-left corner (x0, y0)
     /// and bottom-right corner (x1, y1).
     ///
@@ -224,33 +222,34 @@ where
         x1: u16,
         y1: u16,
         data: I,
-    ) -> Result<(), Error<SpiE, PinE>> {
+    ) -> Result<(), IFACE::Error> {
         self.set_window(x0, y0, x1, y1)?;
         self.write_iter(data)
     }
+
     /// Draw a rectangle on the screen, represented by top-left corner (x0, y0)
     /// and bottom-right corner (x1, y1).
     ///
     /// The border is included.
     ///
-    /// This method accepts a raw buffer of bytes that will be copied to the screen
+    /// This method accepts a raw buffer of words that will be copied to the screen
     /// video memory.
     ///
-    /// The expected format is rgb565, and the two bytes for a pixel
-    /// are in big endian order.
+    /// The expected format is rgb565.
     pub fn draw_raw(
         &mut self,
         x0: u16,
         y0: u16,
         x1: u16,
         y1: u16,
-        data: &[u8],
-    ) -> Result<(), Error<SpiE, PinE>> {
+        data: &[u16],
+    ) -> Result<(), IFACE::Error> {
         self.set_window(x0, y0, x1, y1)?;
-        self.write_raw(data)
+        self.write_iter(data.iter().cloned())
     }
+
     /// Change the orientation of the screen
-    pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), Error<SpiE, PinE>> {
+    pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), IFACE::Error> {
         match mode {
             Orientation::Portrait => {
                 self.width = WIDTH;
@@ -274,10 +273,12 @@ where
             }
         }
     }
+
     /// Get the current screen width. It can change based on the current orientation
     pub fn width(&self) -> usize {
         self.width
     }
+
     /// Get the current screen heighth. It can change based on the current orientation
     pub fn height(&self) -> usize {
         self.height
@@ -290,22 +291,20 @@ use embedded_graphics::drawable;
 use embedded_graphics::{drawable::Pixel, pixelcolor::Rgb565, Drawing};
 
 #[cfg(feature = "graphics")]
-impl<SpiE, PinE, SPI, CS, DC, RESET> Drawing<Rgb565> for Ili9341<SPI, CS, DC, RESET>
+impl<IfaceE, PinE, IFACE, RESET> Drawing<Rgb565> for Ili9341<IFACE, RESET>
 where
-    SPI: spi::Transfer<u8, Error = SpiE> + spi::Write<u8, Error = SpiE>,
-    CS: OutputPin<Error = PinE>,
-    DC: OutputPin<Error = PinE>,
+    IFACE: Interface<Error = IfaceE>,
     RESET: OutputPin<Error = PinE>,
-    SpiE: Debug,
+    IfaceE: Debug,
     PinE: Debug,
 {
     fn draw<T>(&mut self, item_pixels: T)
     where
         T: IntoIterator<Item = drawable::Pixel<Rgb565>>,
     {
-        const BUF_SIZE: usize = 64;
+        const BUF_SIZE: usize = 32;
 
-        let mut row: [u8; BUF_SIZE] = [0; BUF_SIZE];
+        let mut row: [u16; BUF_SIZE] = [0; BUF_SIZE];
         let mut i = 0;
         let mut lasty = 0;
         let mut startx = 0;
@@ -327,14 +326,8 @@ where
                     startx = pos.x;
                 }
                 // Add pixel color to buffer
-                for b in embedded_graphics::pixelcolor::raw::RawU16::from(color)
-                    .into_inner()
-                    .to_be_bytes()
-                    .iter()
-                {
-                    row[i] = *b;
-                    i += 1;
-                }
+                row[i] = embedded_graphics::pixelcolor::raw::RawU16::from(color).into_inner();
+                i += 1;
                 lasty = pos.y;
                 endx = pos.x;
             } else {
@@ -351,14 +344,8 @@ where
                 // Start new line of contiguous pixels
                 i = 0;
                 startx = pos.x;
-                for b in embedded_graphics::pixelcolor::raw::RawU16::from(color)
-                    .into_inner()
-                    .to_be_bytes()
-                    .iter()
-                {
-                    row[i] = *b;
-                    i += 1;
-                }
+                row[i] = embedded_graphics::pixelcolor::raw::RawU16::from(color).into_inner();
+                i += 1;
                 lasty = pos.y;
                 endx = pos.x;
             }
