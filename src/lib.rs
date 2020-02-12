@@ -13,6 +13,8 @@ use core::iter::IntoIterator;
 pub mod spi;
 use spi::SpiInterface;
 
+pub mod gpio;
+
 /// Trait representing the interface to the hardware.
 ///
 /// Intended to abstract the various buses (SPI, MPU 8/9/16-bit) from the Controller code.
