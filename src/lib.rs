@@ -4,7 +4,7 @@
 extern crate embedded_graphics;
 
 use embedded_hal::blocking::delay::DelayMs;
-use embedded_hal::blocking::spi::{Write, Transfer};
+use embedded_hal::blocking::spi::{Transfer, Write};
 use embedded_hal::digital::v2::OutputPin;
 
 use core::fmt::Debug;
@@ -30,7 +30,11 @@ pub trait Interface {
     ///
     /// Mostly used for sending MemoryWrite command and other commands
     /// with 16-bit arguments
-    fn write_iter(&mut self, command: u8, data: impl IntoIterator<Item = u16>) -> Result<(), Self::Error>;
+    fn write_iter(
+        &mut self,
+        command: u8,
+        data: impl IntoIterator<Item = u16>,
+    ) -> Result<(), Self::Error>;
 }
 
 const WIDTH: usize = 240;
@@ -102,9 +106,9 @@ where
 }
 
 impl<IfaceE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
-    where
-        IFACE: Interface<Error=IfaceE>,
-        RESET: OutputPin<Error = PinE>,
+where
+    IFACE: Interface<Error = IfaceE>,
+    RESET: OutputPin<Error = PinE>,
 {
     pub fn new<DELAY: DelayMs<u16>>(
         interface: IFACE,
@@ -159,10 +163,7 @@ impl<IfaceE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
         Ok(ili9341)
     }
 
-    fn hard_reset<DELAY: DelayMs<u16>>(
-        &mut self,
-        delay: &mut DELAY,
-    ) -> Result<(), PinE> {
+    fn hard_reset<DELAY: DelayMs<u16>>(&mut self, delay: &mut DELAY) -> Result<(), PinE> {
         // set high if previously low
         self.reset.set_high()?;
         delay.delay_ms(200);
@@ -179,10 +180,7 @@ impl<IfaceE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
         self.interface.write(cmd as u8, args)
     }
 
-    fn write_iter<I: IntoIterator<Item = u16>>(
-        &mut self,
-        data: I,
-    ) -> Result<(), IFACE::Error> {
+    fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result<(), IFACE::Error> {
         self.interface.write_iter(Command::MemoryWrite as u8, data)
     }
 
@@ -290,79 +288,43 @@ impl<IfaceE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
 #[cfg(feature = "graphics")]
 use embedded_graphics::drawable;
 #[cfg(feature = "graphics")]
-use embedded_graphics::{drawable::Pixel, pixelcolor::Rgb565, Drawing};
+use embedded_graphics::{
+    drawable::Pixel,
+    geometry::Size,
+    pixelcolor::{
+        raw::{RawData, RawU16},
+        Rgb565,
+    },
+    DrawTarget,
+};
 
 #[cfg(feature = "graphics")]
-impl<IfaceE, PinE, IFACE, RESET> Drawing<Rgb565> for Ili9341<IFACE, RESET>
+impl<IfaceE, PinE, IFACE, RESET> DrawTarget<Rgb565> for Ili9341<IFACE, RESET>
 where
     IFACE: Interface<Error = IfaceE>,
     RESET: OutputPin<Error = PinE>,
     IfaceE: Debug,
     PinE: Debug,
 {
-    fn draw<T>(&mut self, item_pixels: T)
-    where
-        T: IntoIterator<Item = drawable::Pixel<Rgb565>>,
-    {
-        const BUF_SIZE: usize = 32;
+    type Error = IFACE::Error;
 
-        let mut row: [u16; BUF_SIZE] = [0; BUF_SIZE];
-        let mut i = 0;
-        let mut lasty = 0;
-        let mut startx = 0;
-        let mut endx = 0;
-        let width = self.width as i32;
-        let height = self.height as i32;
+    fn size(&self) -> Size {
+        Size::new(self.width as u32, self.height as u32)
+    }
+    fn draw_pixel(&mut self, pixel: Pixel<Rgb565>) -> Result<(), Self::Error> {
+        let Pixel(pos, color) = pixel;
 
-        // Filter out pixels that are off the screen
-        let on_screen_pixels = item_pixels.into_iter().filter(|drawable::Pixel(point, _)| {
-            point.x >= 0 && point.y >= 0 && point.x < width && point.y < height
-        });
-
-        for Pixel(pos, color) in on_screen_pixels {
-            use embedded_graphics::pixelcolor::raw::RawData;
-            // Check if pixel is contiguous with previous pixel
-            if i == 0 || (pos.y == lasty && (pos.x == endx + 1) && i < BUF_SIZE - 1) {
-                if i == 0 {
-                    // New line of pixels
-                    startx = pos.x;
-                }
-                // Add pixel color to buffer
-                row[i] = embedded_graphics::pixelcolor::raw::RawU16::from(color).into_inner();
-                i += 1;
-                lasty = pos.y;
-                endx = pos.x;
-            } else {
-                // Line of contiguous pixels has ended, so draw it now
-                self.draw_raw(
-                    startx as u16,
-                    lasty as u16,
-                    endx as u16,
-                    lasty as u16,
-                    &row[0..i],
-                )
-                .expect("Failed to communicate with device");
-
-                // Start new line of contiguous pixels
-                i = 0;
-                startx = pos.x;
-                row[i] = embedded_graphics::pixelcolor::raw::RawU16::from(color).into_inner();
-                i += 1;
-                lasty = pos.y;
-                endx = pos.x;
-            }
+        if pos.x < 0 || pos.y < 0 || pos.x > self.width as i32 || pos.y > self.height as i32 {
+            return Ok(());
         }
-        if i > 0 {
-            // Draw remaining pixels in buffer
-            self.draw_raw(
-                startx as u16,
-                lasty as u16,
-                endx as u16,
-                lasty as u16,
-                &row[0..i],
-            )
-            .expect("Failed to communicate with device");
-        }
+
+        self.draw_raw(
+            pos.x as u16,
+            pos.y as u16,
+            pos.x as u16,
+            pos.y as u16,
+            &[RawU16::from(color).into_inner()],
+        )
     }
 }
 
