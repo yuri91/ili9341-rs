@@ -7,6 +7,7 @@
 
 - Putting pixels on the screen
 - Change the screen orientation
+- Compatible with [embedded-graphics](https://docs.rs/embedded-graphics)
 
 ## TODO
 
