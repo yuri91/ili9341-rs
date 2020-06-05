@@ -82,12 +82,14 @@ where
     }
 
     fn clear(&mut self, color: Rgb565) -> Result<(), Self::Error> {
+        let color = RawU16::from(color).into_inner();
+
         self.draw_iter(
             0,
             0,
             (self.width - 1) as u16,
             (self.height - 1) as u16,
-            iter::repeat(RawU16::from(color).into_inner()).take(self.width * self.height),
+            iter::repeat(color).take(self.width * self.height),
         )
     }
 }
