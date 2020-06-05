@@ -1,6 +1,6 @@
 use crate::{Ili9341, Interface, OutputPin};
 
-use core::fmt::Debug;
+use core::{fmt::Debug, iter};
 
 use embedded_graphics::{
     drawable::Pixel,
@@ -26,6 +26,7 @@ where
     fn size(&self) -> Size {
         Size::new(self.width as u32, self.height as u32)
     }
+
     fn draw_pixel(&mut self, pixel: Pixel<Rgb565>) -> Result<(), Self::Error> {
         let Pixel(pos, color) = pixel;
 
@@ -41,6 +42,7 @@ where
             &[RawU16::from(color).into_inner()],
         )
     }
+
     fn draw_rectangle(
         &mut self,
         item: &Styled<Rectangle, PrimitiveStyle<Rgb565>>,
@@ -76,6 +78,16 @@ where
                     x >= 0 && y >= 0 && x < w && y < h
                 })
                 .map(|p| RawU16::from(p.1).into_inner()),
+        )
+    }
+
+    fn clear(&mut self, color: Rgb565) -> Result<(), Self::Error> {
+        self.draw_iter(
+            0,
+            0,
+            (self.width - 1) as u16,
+            (self.height - 1) as u16,
+            iter::repeat(RawU16::from(color).into_inner()).take(self.width * self.height),
         )
     }
 }
