@@ -4,13 +4,13 @@
 extern crate embedded_graphics;
 
 use embedded_hal::blocking::delay::DelayMs;
-use embedded_hal::blocking::spi::{Transfer, Write};
 use embedded_hal::digital::v2::OutputPin;
 
-pub mod spi;
-use spi::SpiInterface;
+use core::iter::once;
+use display_interface::DataFormat::{U16BEIter, U8Iter};
+use display_interface::WriteOnlyDataCommand;
 
-pub mod gpio;
+pub mod spi;
 
 /// Trait representing the interface to the hardware.
 ///
@@ -38,15 +38,9 @@ const WIDTH: usize = 240;
 const HEIGHT: usize = 320;
 
 #[derive(Debug)]
-pub enum Error<IfaceE, PinE> {
-    Interface(IfaceE),
+pub enum Error<PinE> {
+    Interface,
     OutputPin(PinE),
-}
-
-impl<IfaceE, PinE> From<IfaceE> for Error<IfaceE, PinE> {
-    fn from(e: IfaceE) -> Self {
-        Error::Interface(e)
-    }
 }
 
 /// The default orientation is Portrait
@@ -80,38 +74,16 @@ pub struct Ili9341<IFACE, RESET> {
     height: usize,
 }
 
-impl<SpiE, PinE, SPI, CS, DC, RESET> Ili9341<SpiInterface<SPI, CS, DC>, RESET>
+impl<PinE, IFACE, RESET> Ili9341<IFACE, RESET>
 where
-    SPI: Transfer<u8, Error = SpiE> + Write<u8, Error = SpiE>,
-    CS: OutputPin<Error = PinE>,
-    DC: OutputPin<Error = PinE>,
-    RESET: OutputPin<Error = PinE>,
-{
-    pub fn new_spi<DELAY: DelayMs<u16>>(
-        spi: SPI,
-        cs: CS,
-        dc: DC,
-        reset: RESET,
-        delay: &mut DELAY,
-    ) -> Result<Self, Error<SpiE, PinE>> {
-        let interface = SpiInterface::new(spi, cs, dc);
-        Self::new(interface, reset, delay).map_err(|e| match e {
-            Error::Interface(inner) => inner,
-            Error::OutputPin(inner) => Error::OutputPin(inner),
-        })
-    }
-}
-
-impl<IfaceE, PinE, IFACE, RESET> Ili9341<IFACE, RESET>
-where
-    IFACE: Interface<Error = IfaceE>,
+    IFACE: WriteOnlyDataCommand,
     RESET: OutputPin<Error = PinE>,
 {
     pub fn new<DELAY: DelayMs<u16>>(
         interface: IFACE,
         reset: RESET,
         delay: &mut DELAY,
-    ) -> Result<Self, Error<IfaceE, PinE>> {
+    ) -> Result<Self, Error<PinE>> {
         let mut ili9341 = Ili9341 {
             interface,
             reset,
@@ -173,15 +145,23 @@ where
         Ok(())
     }
 
-    fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), IFACE::Error> {
-        self.interface.write(cmd as u8, args)
+    fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), Error<PinE>> {
+        self.interface
+            .send_commands(U8Iter(&mut once(cmd as u8)))
+            .map_err(|_| Error::Interface)?;
+        self.interface
+            .send_data(U8Iter(&mut args.iter().cloned()))
+            .map_err(|_| Error::Interface)
     }
 
-    fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result<(), IFACE::Error> {
-        self.interface.write_iter(Command::MemoryWrite as u8, data)
+    fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result<(), Error<PinE>> {
+        self.command(Command::MemoryWrite, &[])?;
+        self.interface
+            .send_data(U16BEIter(&mut data.into_iter()))
+            .map_err(|_| Error::Interface)
     }
 
-    fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result<(), IFACE::Error> {
+    fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result<(), Error<PinE>> {
         self.command(
             Command::ColumnAddressSet,
             &[
@@ -219,7 +199,7 @@ where
         x1: u16,
         y1: u16,
         data: I,
-    ) -> Result<(), IFACE::Error> {
+    ) -> Result<(), Error<PinE>> {
         self.set_window(x0, y0, x1, y1)?;
         self.write_iter(data)
     }
@@ -240,13 +220,13 @@ where
         x1: u16,
         y1: u16,
         data: &[u16],
-    ) -> Result<(), IFACE::Error> {
+    ) -> Result<(), Error<PinE>> {
         self.set_window(x0, y0, x1, y1)?;
         self.write_iter(data.iter().cloned())
     }
 
     /// Change the orientation of the screen
-    pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), IFACE::Error> {
+    pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), Error<PinE>> {
         match mode {
             Orientation::Portrait => {
                 self.width = WIDTH;
