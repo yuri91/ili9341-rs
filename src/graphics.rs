@@ -1,94 +1,74 @@
 use crate::{Ili9341, OutputPin};
 
-use core::{fmt::Debug, iter};
+use core::fmt::Debug;
 
 use embedded_graphics::{
-    drawable::Pixel,
     geometry::{Point, Size},
     pixelcolor::{
         raw::{RawData, RawU16},
         Rgb565,
     },
-    primitives::Rectangle,
-    style::{PrimitiveStyle, Styled},
-    DrawTarget,
+    primitives::{ContainsPoint, Primitive, Rectangle},
+    DrawTarget, Pixel,
 };
 
-impl<PinE, IFACE, RESET> DrawTarget<Rgb565> for Ili9341<IFACE, RESET>
+impl<PinE, IFACE, RESET> DrawTarget for Ili9341<IFACE, RESET>
 where
     IFACE: display_interface::WriteOnlyDataCommand,
     RESET: OutputPin<Error = PinE>,
     PinE: Debug,
 {
+    type Color = Rgb565;
     type Error = crate::Error<PinE>;
 
     fn size(&self) -> Size {
         Size::new(self.width as u32, self.height as u32)
     }
 
-    fn draw_pixel(&mut self, pixel: Pixel<Rgb565>) -> Result<(), Self::Error> {
-        let Pixel(pos, color) = pixel;
-
-        if pos.x < 0 || pos.y < 0 || pos.x >= self.width as i32 || pos.y >= self.height as i32 {
-            return Ok(());
-        }
-
-        self.draw_raw(
-            pos.x as u16,
-            pos.y as u16,
-            pos.x as u16,
-            pos.y as u16,
-            &[RawU16::from(color).into_inner()],
-        )
-    }
-
-    fn draw_rectangle(
-        &mut self,
-        item: &Styled<Rectangle, PrimitiveStyle<Rgb565>>,
-    ) -> Result<(), Self::Error> {
-        let Point { x: x0, y: y0 } = item.primitive.top_left;
-        let Point { x: x1, y: y1 } = item.primitive.bottom_right;
-        let w = self.width as i32;
-        let h = self.height as i32;
-        if x0 >= w || y0 >= h {
-            return Ok(());
-        }
-        fn clamp(v: i32, max: i32) -> u16 {
-            if v < 0 {
-                0
-            } else if v > max {
-                max as u16
-            } else {
-                v as u16
+    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+    where
+        I: IntoIterator<Item = Pixel<Self::Color>>,
+    {
+        for Pixel(coord, color) in pixels.into_iter() {
+            // Only draw pixels that would be on screen
+            if coord.x >= 0
+                && coord.y >= 0
+                && coord.x < self.width as i32
+                && coord.y < self.height as i32
+            {
+                self.draw_raw(
+                    coord.x as u16,
+                    coord.y as u16,
+                    coord.x as u16,
+                    coord.y as u16,
+                    &[RawU16::from(color).into_inner()],
+                )?;
             }
         }
-        let x0 = clamp(x0, w - 1);
-        let y0 = clamp(y0, h - 1);
-        let x1 = clamp(x1, w - 1);
-        let y1 = clamp(y1, h - 1);
-        self.draw_iter(
-            x0,
-            y0,
-            x1,
-            y1,
-            item.into_iter()
-                .filter(|p| {
-                    let Point { x, y } = p.0;
-                    x >= 0 && y >= 0 && x < w && y < h
-                })
-                .map(|p| RawU16::from(p.1).into_inner()),
-        )
+
+        Ok(())
     }
 
-    fn clear(&mut self, color: Rgb565) -> Result<(), Self::Error> {
-        let color = RawU16::from(color).into_inner();
+    fn fill_contiguous<I>(&mut self, area: &Rectangle, colors: I) -> Result<(), Self::Error>
+    where
+        I: IntoIterator<Item = Self::Color>,
+    {
+        // Clamp area to drawable part of the display target
+        let drawable_area = area.intersection(&Rectangle::new(Point::zero(), self.size()));
 
-        self.draw_iter(
-            0,
-            0,
-            (self.width - 1) as u16,
-            (self.height - 1) as u16,
-            iter::repeat(color).take(self.width * self.height),
-        )
+        if drawable_area.size != Size::zero() {
+            self.draw_rect_iter(
+                drawable_area.top_left.x as u16,
+                drawable_area.top_left.y as u16,
+                (drawable_area.top_left.x + (drawable_area.size.width - 1) as i32) as u16,
+                (drawable_area.top_left.y + (drawable_area.size.height - 1) as i32) as u16,
+                area.points()
+                    .zip(colors)
+                    .filter(|(pos, _color)| drawable_area.contains(*pos))
+                    .map(|(_pos, color)| RawU16::from(color).into_inner()),
+            )?;
+        }
+
+        Ok(())
     }
 }

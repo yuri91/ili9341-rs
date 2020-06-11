@@ -15,8 +15,9 @@ display-interface = "0.4"
 embedded-hal = "0.2.3"
 
 [dependencies.embedded-graphics]
+git = "https://github.com/jamwaffles/embedded-graphics.git"
 optional = true
-version = "0.6.1"
+rev = "868060de9ef116be3ba20841b871581e2d398307"
 
 [features]
 default = ["graphics"]

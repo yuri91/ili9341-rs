@@ -53,7 +53,7 @@ pub enum Orientation {
 
 /// There are two method for drawing to the screen:
 /// [draw_raw](struct.Ili9341.html#method.draw_raw) and
-/// [draw_iter](struct.Ili9341.html#method.draw_iter).
+/// [draw_rect_iter](struct.Ili9341.html#method.draw_rect_iter).
 ///
 /// In both cases the expected pixel format is rgb565.
 ///
@@ -192,7 +192,7 @@ where
     ///
     /// The iterator is useful to avoid wasting memory by holding a buffer for
     /// the whole screen when it is not necessary.
-    pub fn draw_iter<I: IntoIterator<Item = u16>>(
+    pub fn draw_rect_iter<I: IntoIterator<Item = u16>>(
         &mut self,
         x0: u16,
         y0: u16,
