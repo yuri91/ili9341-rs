@@ -110,7 +110,6 @@ where
 
         ili9341.command(Command::MemoryAccessControl, &[0x48])?;
         ili9341.command(Command::PixelFormatSet, &[0x55])?;
-        ili9341.command(Command::GammaSet, &[0x01])?;
 
         ili9341.command(Command::SleepOut, &[])?;
 
@@ -247,7 +246,6 @@ enum Command {
     SoftwareReset = 0x01,
     MemoryAccessControl = 0x36,
     PixelFormatSet = 0x3a,
-    GammaSet = 0x26,
     SleepOut = 0x11,
     DisplayOn = 0x29,
     ColumnAddressSet = 0x2a,
