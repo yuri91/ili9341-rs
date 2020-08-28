@@ -110,6 +110,7 @@ where
 
         ili9341.set_orientation(Orientation::Portrait)?;
 
+        // Set pixel format to 16 bits per pixel
         ili9341.command(Command::PixelFormatSet, &[0x55])?;
 
         ili9341.command(Command::SleepOut, &[])?;
