@@ -91,9 +91,22 @@ where
             height: HEIGHT,
         };
 
-        ili9341.hard_reset(delay).map_err(Error::OutputPin)?;
+        // Do hardware reset by holding reset low for at least 10us
+        ili9341.reset.set_low().map_err(Error::OutputPin)?;
+        delay.delay_ms(1);
+        // Set high for normal operation
+        ili9341.reset.set_high().map_err(Error::OutputPin)?;
+
+        // Wait 5ms after reset before sending commands
+        // and 120ms before sending Sleep Out
+        delay.delay_ms(5);
+
+        // Do software reset
         ili9341.command(Command::SoftwareReset, &[])?;
-        delay.delay_ms(200);
+
+        // Wait 5ms after reset before sending commands
+        // and 120ms before sending Sleep Out
+        delay.delay_ms(120);
 
         ili9341.command(Command::PowerControlA, &[0x39, 0x2c, 0x00, 0x34, 0x02])?;
         ili9341.command(Command::PowerControlB, &[0x00, 0xc1, 0x30])?;
@@ -125,24 +138,15 @@ where
                 0x0f,
             ],
         )?;
+
         ili9341.command(Command::SleepOut, &[])?;
-        delay.delay_ms(120);
+
+        // Wait 5ms after Sleep Out before sending commands
+        delay.delay_ms(5);
+
         ili9341.command(Command::DisplayOn, &[])?;
 
         Ok(ili9341)
-    }
-
-    fn hard_reset<DELAY: DelayMs<u16>>(&mut self, delay: &mut DELAY) -> Result<(), PinE> {
-        // set high if previously low
-        self.reset.set_high()?;
-        delay.delay_ms(200);
-        // set low for reset
-        self.reset.set_low()?;
-        delay.delay_ms(200);
-        // set high for normal operation
-        self.reset.set_high()?;
-        delay.delay_ms(200);
-        Ok(())
     }
 
     fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), Error<PinE>> {
