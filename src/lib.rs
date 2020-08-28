@@ -108,7 +108,8 @@ where
         // and 120ms before sending Sleep Out
         delay.delay_ms(120);
 
-        ili9341.command(Command::MemoryAccessControl, &[0x48])?;
+        ili9341.set_orientation(Orientation::Portrait)?;
+
         ili9341.command(Command::PixelFormatSet, &[0x55])?;
 
         ili9341.command(Command::SleepOut, &[])?;
