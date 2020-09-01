@@ -91,58 +91,36 @@ where
             height: HEIGHT,
         };
 
-        ili9341.hard_reset(delay).map_err(Error::OutputPin)?;
-        ili9341.command(Command::SoftwareReset, &[])?;
-        delay.delay_ms(200);
+        // Do hardware reset by holding reset low for at least 10us
+        ili9341.reset.set_low().map_err(Error::OutputPin)?;
+        delay.delay_ms(1);
+        // Set high for normal operation
+        ili9341.reset.set_high().map_err(Error::OutputPin)?;
 
-        ili9341.command(Command::PowerControlA, &[0x39, 0x2c, 0x00, 0x34, 0x02])?;
-        ili9341.command(Command::PowerControlB, &[0x00, 0xc1, 0x30])?;
-        ili9341.command(Command::DriverTimingControlA, &[0x85, 0x00, 0x78])?;
-        ili9341.command(Command::DriverTimingControlB, &[0x00, 0x00])?;
-        ili9341.command(Command::PowerOnSequenceControl, &[0x64, 0x03, 0x12, 0x81])?;
-        ili9341.command(Command::PumpRatioControl, &[0x20])?;
-        ili9341.command(Command::PowerControl1, &[0x23])?;
-        ili9341.command(Command::PowerControl2, &[0x10])?;
-        ili9341.command(Command::VCOMControl1, &[0x3e, 0x28])?;
-        ili9341.command(Command::VCOMControl2, &[0x86])?;
-        ili9341.command(Command::MemoryAccessControl, &[0x48])?;
-        ili9341.command(Command::PixelFormatSet, &[0x55])?;
-        ili9341.command(Command::FrameControlNormal, &[0x00, 0x18])?;
-        ili9341.command(Command::DisplayFunctionControl, &[0x08, 0x82, 0x27])?;
-        ili9341.command(Command::Enable3G, &[0x00])?;
-        ili9341.command(Command::GammaSet, &[0x01])?;
-        ili9341.command(
-            Command::PositiveGammaCorrection,
-            &[
-                0x0f, 0x31, 0x2b, 0x0c, 0x0e, 0x08, 0x4e, 0xf1, 0x37, 0x07, 0x10, 0x03, 0x0e, 0x09,
-                0x00,
-            ],
-        )?;
-        ili9341.command(
-            Command::NegativeGammaCorrection,
-            &[
-                0x00, 0x0e, 0x14, 0x03, 0x11, 0x07, 0x31, 0xc1, 0x48, 0x08, 0x0f, 0x0c, 0x31, 0x36,
-                0x0f,
-            ],
-        )?;
-        ili9341.command(Command::SleepOut, &[])?;
+        // Wait 5ms after reset before sending commands
+        // and 120ms before sending Sleep Out
+        delay.delay_ms(5);
+
+        // Do software reset
+        ili9341.command(Command::SoftwareReset, &[])?;
+
+        // Wait 5ms after reset before sending commands
+        // and 120ms before sending Sleep Out
         delay.delay_ms(120);
+
+        ili9341.set_orientation(Orientation::Portrait)?;
+
+        // Set pixel format to 16 bits per pixel
+        ili9341.command(Command::PixelFormatSet, &[0x55])?;
+
+        ili9341.command(Command::SleepOut, &[])?;
+
+        // Wait 5ms after Sleep Out before sending commands
+        delay.delay_ms(5);
+
         ili9341.command(Command::DisplayOn, &[])?;
 
         Ok(ili9341)
-    }
-
-    fn hard_reset<DELAY: DelayMs<u16>>(&mut self, delay: &mut DELAY) -> Result<(), PinE> {
-        // set high if previously low
-        self.reset.set_high()?;
-        delay.delay_ms(200);
-        // set low for reset
-        self.reset.set_low()?;
-        delay.delay_ms(200);
-        // set high for normal operation
-        self.reset.set_high()?;
-        delay.delay_ms(200);
-        Ok(())
     }
 
     fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), Error<PinE>> {
@@ -268,24 +246,8 @@ mod graphics;
 #[derive(Clone, Copy)]
 enum Command {
     SoftwareReset = 0x01,
-    PowerControlA = 0xcb,
-    PowerControlB = 0xcf,
-    DriverTimingControlA = 0xe8,
-    DriverTimingControlB = 0xea,
-    PowerOnSequenceControl = 0xed,
-    PumpRatioControl = 0xf7,
-    PowerControl1 = 0xc0,
-    PowerControl2 = 0xc1,
-    VCOMControl1 = 0xc5,
-    VCOMControl2 = 0xc7,
     MemoryAccessControl = 0x36,
     PixelFormatSet = 0x3a,
-    FrameControlNormal = 0xb1,
-    DisplayFunctionControl = 0xb6,
-    Enable3G = 0xf2,
-    GammaSet = 0x26,
-    PositiveGammaCorrection = 0xe0,
-    NegativeGammaCorrection = 0xe1,
     SleepOut = 0x11,
     DisplayOn = 0x29,
     ColumnAddressSet = 0x2a,
