@@ -161,6 +161,50 @@ where
         Ok(())
     }
 
+    /// Configures the screen for hardware-accelerated vertical scrolling.
+    pub fn configure_vertical_scroll(
+        &mut self,
+        fixed_top_lines: u16,
+        fixed_bottom_lines: u16,
+    ) -> Result<Scroller, Error<PinE>> {
+        let scroll_lines = HEIGHT as u16 - fixed_top_lines - fixed_bottom_lines;
+
+        self.command(
+            Command::VerticalScrollDefine,
+            &[
+                (fixed_top_lines >> 8) as u8,
+                (fixed_top_lines & 0xff) as u8,
+                (scroll_lines >> 8) as u8,
+                (scroll_lines & 0xff) as u8,
+                (fixed_bottom_lines >> 8) as u8,
+                (fixed_bottom_lines & 0xff) as u8,
+            ],
+        )?;
+
+        Ok(Scroller::new(fixed_top_lines, fixed_bottom_lines))
+    }
+
+    pub fn scroll_vertically(
+        &mut self,
+        scroller: &mut Scroller,
+        num_lines: u16,
+    ) -> Result<(), Error<PinE>> {
+        let height = HEIGHT as u16;
+        scroller.top_offset += num_lines;
+        if scroller.top_offset > (height - scroller.fixed_bottom_lines) {
+            scroller.top_offset = scroller.fixed_top_lines
+                + (scroller.top_offset - height + scroller.fixed_bottom_lines)
+        }
+
+        self.command(
+            Command::VerticalScrollAddr,
+            &[
+                (scroller.top_offset >> 8) as u8,
+                (scroller.top_offset & 0xff) as u8,
+            ],
+        )
+    }
+
     /// Draw a rectangle on the screen, represented by top-left corner (x0, y0)
     /// and bottom-right corner (x1, y1).
     ///
@@ -240,6 +284,24 @@ where
     }
 }
 
+/// Scroller must be provided in order to scroll the screen. It can only be obtained
+/// by configuring the screen for scrolling.
+pub struct Scroller {
+    top_offset: u16,
+    fixed_bottom_lines: u16,
+    fixed_top_lines: u16,
+}
+
+impl Scroller {
+    fn new(fixed_top_lines: u16, fixed_bottom_lines: u16) -> Scroller {
+        Scroller {
+            top_offset: fixed_top_lines,
+            fixed_top_lines,
+            fixed_bottom_lines,
+        }
+    }
+}
+
 #[cfg(feature = "graphics")]
 mod graphics;
 
@@ -253,4 +315,6 @@ enum Command {
     ColumnAddressSet = 0x2a,
     PageAddressSet = 0x2b,
     MemoryWrite = 0x2c,
+    VerticalScrollDefine = 0x33,
+    VerticalScrollAddr = 0x37,
 }
