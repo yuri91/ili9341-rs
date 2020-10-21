@@ -7,12 +7,12 @@
 
 - Putting pixels on the screen
 - Change the screen orientation
+- Hardware scrolling
 - Compatible with [embedded-graphics](https://docs.rs/embedded-graphics)
 
 ## TODO
 
 - [ ] Expose more configuration options
-- [ ] Scrolling
 - [ ] Read video memory
 - [ ] DMA API
 - ???
