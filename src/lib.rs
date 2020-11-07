@@ -34,8 +34,29 @@ pub trait Interface {
     ) -> Result<(), Self::Error>;
 }
 
-const WIDTH: usize = 240;
-const HEIGHT: usize = 320;
+/// Trait that defines display size information
+pub trait DisplaySize {
+    /// Width in pixels
+    const WIDTH: usize;
+    /// Height in pixels
+    const HEIGHT: usize;
+}
+
+/// Generic display size of 240x320 pixels
+pub struct DisplaySize240x320;
+
+impl DisplaySize for DisplaySize240x320 {
+    const WIDTH: usize = 240;
+    const HEIGHT: usize = 320;
+}
+
+/// Generic display size of 320x480 pixels
+pub struct DisplaySize320x480;
+
+impl DisplaySize for DisplaySize320x480 {
+    const WIDTH: usize = 320;
+    const HEIGHT: usize = 480;
+}
 
 #[derive(Debug)]
 pub enum Error<PinE> {
@@ -72,6 +93,7 @@ pub struct Ili9341<IFACE, RESET> {
     reset: RESET,
     width: usize,
     height: usize,
+    mode: Orientation,
 }
 
 impl<PinE, IFACE, RESET> Ili9341<IFACE, RESET>
@@ -79,16 +101,23 @@ where
     IFACE: WriteOnlyDataCommand,
     RESET: OutputPin<Error = PinE>,
 {
-    pub fn new<DELAY: DelayMs<u16>>(
+    pub fn new<DELAY, SIZE>(
         interface: IFACE,
         reset: RESET,
         delay: &mut DELAY,
-    ) -> Result<Self, Error<PinE>> {
+        mode: Orientation,
+        _display_size: SIZE,
+    ) -> Result<Self, Error<PinE>>
+    where
+        DELAY: DelayMs<u16>,
+        SIZE: DisplaySize,
+    {
         let mut ili9341 = Ili9341 {
             interface,
             reset,
-            width: WIDTH,
-            height: HEIGHT,
+            width: SIZE::WIDTH,
+            height: SIZE::HEIGHT,
+            mode: Orientation::Portrait,
         };
 
         // Do hardware reset by holding reset low for at least 10us
@@ -108,7 +137,7 @@ where
         // and 120ms before sending Sleep Out
         delay.delay_ms(120);
 
-        ili9341.set_orientation(Orientation::Portrait)?;
+        ili9341.set_orientation(mode)?;
 
         // Set pixel format to 16 bits per pixel
         ili9341.command(Command::PixelFormatSet, &[0x55])?;
@@ -167,7 +196,11 @@ where
         fixed_top_lines: u16,
         fixed_bottom_lines: u16,
     ) -> Result<Scroller, Error<PinE>> {
-        let scroll_lines = HEIGHT as u16 - fixed_top_lines - fixed_bottom_lines;
+        let height = match self.mode {
+            Orientation::Landscape | Orientation::LandscapeFlipped => self.width,
+            Orientation::Portrait | Orientation::PortraitFlipped => self.height,
+        } as u16;
+        let scroll_lines = height as u16 - fixed_top_lines - fixed_bottom_lines;
 
         self.command(
             Command::VerticalScrollDefine,
@@ -181,7 +214,7 @@ where
             ],
         )?;
 
-        Ok(Scroller::new(fixed_top_lines, fixed_bottom_lines))
+        Ok(Scroller::new(fixed_top_lines, fixed_bottom_lines, height))
     }
 
     pub fn scroll_vertically(
@@ -189,11 +222,10 @@ where
         scroller: &mut Scroller,
         num_lines: u16,
     ) -> Result<(), Error<PinE>> {
-        let height = HEIGHT as u16;
         scroller.top_offset += num_lines;
-        if scroller.top_offset > (height - scroller.fixed_bottom_lines) {
+        if scroller.top_offset > (scroller.height - scroller.fixed_bottom_lines) {
             scroller.top_offset = scroller.fixed_top_lines
-                + (scroller.top_offset - height + scroller.fixed_bottom_lines)
+                + (scroller.top_offset - scroller.height + scroller.fixed_bottom_lines)
         }
 
         self.command(
@@ -249,28 +281,33 @@ where
 
     /// Change the orientation of the screen
     pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), Error<PinE>> {
-        match mode {
+        let was_landscape = match self.mode {
+            Orientation::Landscape | Orientation::LandscapeFlipped => true,
+            Orientation::Portrait | Orientation::PortraitFlipped => false,
+        };
+        let is_landscape = match mode {
             Orientation::Portrait => {
-                self.width = WIDTH;
-                self.height = HEIGHT;
-                self.command(Command::MemoryAccessControl, &[0x40 | 0x08])
+                self.command(Command::MemoryAccessControl, &[0x40 | 0x08])?;
+                false
             }
             Orientation::Landscape => {
-                self.width = HEIGHT;
-                self.height = WIDTH;
-                self.command(Command::MemoryAccessControl, &[0x20 | 0x08])
+                self.command(Command::MemoryAccessControl, &[0x20 | 0x08])?;
+                true
             }
             Orientation::PortraitFlipped => {
-                self.width = WIDTH;
-                self.height = HEIGHT;
-                self.command(Command::MemoryAccessControl, &[0x80 | 0x08])
+                self.command(Command::MemoryAccessControl, &[0x80 | 0x08])?;
+                false
             }
             Orientation::LandscapeFlipped => {
-                self.width = HEIGHT;
-                self.height = WIDTH;
-                self.command(Command::MemoryAccessControl, &[0x40 | 0x80 | 0x20 | 0x08])
+                self.command(Command::MemoryAccessControl, &[0x40 | 0x80 | 0x20 | 0x08])?;
+                true
             }
+        };
+        if was_landscape ^ is_landscape {
+            core::mem::swap(&mut self.height, &mut self.width);
         }
+        self.mode = mode;
+        Ok(())
     }
 
     /// Get the current screen width. It can change based on the current orientation
@@ -290,14 +327,16 @@ pub struct Scroller {
     top_offset: u16,
     fixed_bottom_lines: u16,
     fixed_top_lines: u16,
+    height: u16,
 }
 
 impl Scroller {
-    fn new(fixed_top_lines: u16, fixed_bottom_lines: u16) -> Scroller {
+    fn new(fixed_top_lines: u16, fixed_bottom_lines: u16, height: u16) -> Scroller {
         Scroller {
             top_offset: fixed_top_lines,
             fixed_top_lines,
             fixed_bottom_lines,
+            height,
         }
     }
 }
