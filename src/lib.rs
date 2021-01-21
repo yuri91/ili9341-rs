@@ -225,7 +225,7 @@ where
         scroller.top_offset += num_lines;
         if scroller.top_offset > (scroller.height - scroller.fixed_bottom_lines) {
             scroller.top_offset = scroller.fixed_top_lines
-                + (scroller.top_offset - scroller.height + scroller.fixed_bottom_lines)
+                + (scroller.top_offset + scroller.fixed_bottom_lines - scroller.height)
         }
 
         self.command(
