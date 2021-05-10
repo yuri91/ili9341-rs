@@ -49,8 +49,7 @@ pub enum Orientation {
 }
 
 /// There are two method for drawing to the screen:
-/// [draw_raw](struct.Ili9341.html#method.draw_raw) and
-/// [draw_iter](struct.Ili9341.html#method.draw_iter).
+/// [Ili9341::draw_raw_iter] and [Ili9341::draw_raw_slice]
 ///
 /// In both cases the expected pixel format is rgb565.
 ///
@@ -219,7 +218,7 @@ where
     ///
     /// The iterator is useful to avoid wasting memory by holding a buffer for
     /// the whole screen when it is not necessary.
-    pub fn draw_iter<I: IntoIterator<Item = u16>>(
+    pub fn draw_raw_iter<I: IntoIterator<Item = u16>>(
         &mut self,
         x0: u16,
         y0: u16,
@@ -240,9 +239,8 @@ where
     /// video memory.
     ///
     /// The expected format is rgb565.
-    pub fn draw_raw(&mut self, x0: u16, y0: u16, x1: u16, y1: u16, data: &[u16]) -> Result {
-        self.set_window(x0, y0, x1, y1)?;
-        self.write_iter(data.iter().cloned())
+    pub fn draw_raw_slice(&mut self, x0: u16, y0: u16, x1: u16, y1: u16, data: &[u16]) -> Result {
+        self.draw_raw_iter(x0, y0, x1, y1, data.iter().copied())
     }
 
     /// Change the orientation of the screen
