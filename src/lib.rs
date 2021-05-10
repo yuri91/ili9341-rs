@@ -1,14 +1,14 @@
 #![no_std]
 
-#[cfg(feature = "graphics")]
-extern crate embedded_graphics;
-
 use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::digital::v2::OutputPin;
 
 use core::iter::once;
 use display_interface::DataFormat::{U16BEIter, U8Iter};
 use display_interface::WriteOnlyDataCommand;
+
+#[cfg(feature = "graphics")]
+mod graphics;
 
 pub use embedded_hal::spi::MODE_0 as SPI_MODE;
 
@@ -306,9 +306,6 @@ impl Scroller {
         }
     }
 }
-
-#[cfg(feature = "graphics")]
-mod graphics;
 
 #[derive(Clone, Copy)]
 enum Command {
