@@ -10,6 +10,9 @@ use display_interface::WriteOnlyDataCommand;
 #[cfg(feature = "graphics")]
 mod graphics;
 
+#[cfg(feature = "graphics-core")]
+mod graphics_core;
+
 pub use embedded_hal::spi::MODE_0 as SPI_MODE;
 
 pub use display_interface::DisplayError;
