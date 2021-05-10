@@ -14,6 +14,8 @@ pub use embedded_hal::spi::MODE_0 as SPI_MODE;
 
 pub use display_interface::DisplayError;
 
+type Result<T = (), E = DisplayError> = core::result::Result<T, E>;
+
 /// Trait that defines display size information
 pub trait DisplaySize {
     /// Width in pixels
@@ -81,7 +83,7 @@ where
         delay: &mut DELAY,
         mode: Orientation,
         _display_size: SIZE,
-    ) -> Result<Self, DisplayError>
+    ) -> Result<Self>
     where
         DELAY: DelayMs<u16>,
         SIZE: DisplaySize,
@@ -129,17 +131,17 @@ where
         Ok(ili9341)
     }
 
-    fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), DisplayError> {
+    fn command(&mut self, cmd: Command, args: &[u8]) -> Result {
         self.interface.send_commands(U8Iter(&mut once(cmd as u8)))?;
         self.interface.send_data(U8Iter(&mut args.iter().cloned()))
     }
 
-    fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result<(), DisplayError> {
+    fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result {
         self.command(Command::MemoryWrite, &[])?;
         self.interface.send_data(U16BEIter(&mut data.into_iter()))
     }
 
-    fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result<(), DisplayError> {
+    fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result {
         self.command(
             Command::ColumnAddressSet,
             &[
@@ -165,7 +167,7 @@ where
         &mut self,
         fixed_top_lines: u16,
         fixed_bottom_lines: u16,
-    ) -> Result<Scroller, DisplayError> {
+    ) -> Result<Scroller> {
         let height = match self.mode {
             Orientation::Landscape | Orientation::LandscapeFlipped => self.width,
             Orientation::Portrait | Orientation::PortraitFlipped => self.height,
@@ -187,11 +189,7 @@ where
         Ok(Scroller::new(fixed_top_lines, fixed_bottom_lines, height))
     }
 
-    pub fn scroll_vertically(
-        &mut self,
-        scroller: &mut Scroller,
-        num_lines: u16,
-    ) -> Result<(), DisplayError> {
+    pub fn scroll_vertically(&mut self, scroller: &mut Scroller, num_lines: u16) -> Result {
         scroller.top_offset += num_lines;
         if scroller.top_offset > (scroller.height - scroller.fixed_bottom_lines) {
             scroller.top_offset = scroller.fixed_top_lines
@@ -223,7 +221,7 @@ where
         x1: u16,
         y1: u16,
         data: I,
-    ) -> Result<(), DisplayError> {
+    ) -> Result {
         self.set_window(x0, y0, x1, y1)?;
         self.write_iter(data)
     }
@@ -237,20 +235,13 @@ where
     /// video memory.
     ///
     /// The expected format is rgb565.
-    pub fn draw_raw(
-        &mut self,
-        x0: u16,
-        y0: u16,
-        x1: u16,
-        y1: u16,
-        data: &[u16],
-    ) -> Result<(), DisplayError> {
+    pub fn draw_raw(&mut self, x0: u16, y0: u16, x1: u16, y1: u16, data: &[u16]) -> Result {
         self.set_window(x0, y0, x1, y1)?;
         self.write_iter(data.iter().cloned())
     }
 
     /// Change the orientation of the screen
-    pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), DisplayError> {
+    pub fn set_orientation(&mut self, mode: Orientation) -> Result {
         let was_landscape = match self.mode {
             Orientation::Landscape | Orientation::LandscapeFlipped => true,
             Orientation::Portrait | Orientation::PortraitFlipped => false,
