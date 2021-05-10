@@ -11,7 +11,7 @@ edition = "2018"
 
 
 [dependencies]
-display-interface = "0.4.0"
+display-interface = "0.4.1"
 embedded-hal = "0.2.4"
 
 [dependencies.embedded-graphics]

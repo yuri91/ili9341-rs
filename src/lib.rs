@@ -12,6 +12,8 @@ use display_interface::WriteOnlyDataCommand;
 
 pub use embedded_hal::spi::MODE_0 as SPI_MODE;
 
+pub use display_interface::DisplayError;
+
 /// Trait that defines display size information
 pub trait DisplaySize {
     /// Width in pixels
@@ -34,12 +36,6 @@ pub struct DisplaySize320x480;
 impl DisplaySize for DisplaySize320x480 {
     const WIDTH: usize = 320;
     const HEIGHT: usize = 480;
-}
-
-#[derive(Debug)]
-pub enum Error<PinE> {
-    Interface,
-    OutputPin(PinE),
 }
 
 /// The default orientation is Portrait
@@ -74,10 +70,10 @@ pub struct Ili9341<IFACE, RESET> {
     mode: Orientation,
 }
 
-impl<PinE, IFACE, RESET> Ili9341<IFACE, RESET>
+impl<IFACE, RESET> Ili9341<IFACE, RESET>
 where
     IFACE: WriteOnlyDataCommand,
-    RESET: OutputPin<Error = PinE>,
+    RESET: OutputPin,
 {
     pub fn new<DELAY, SIZE>(
         interface: IFACE,
@@ -85,7 +81,7 @@ where
         delay: &mut DELAY,
         mode: Orientation,
         _display_size: SIZE,
-    ) -> Result<Self, Error<PinE>>
+    ) -> Result<Self, DisplayError>
     where
         DELAY: DelayMs<u16>,
         SIZE: DisplaySize,
@@ -99,10 +95,13 @@ where
         };
 
         // Do hardware reset by holding reset low for at least 10us
-        ili9341.reset.set_low().map_err(Error::OutputPin)?;
+        ili9341.reset.set_low().map_err(|_| DisplayError::RSError)?;
         delay.delay_ms(1);
         // Set high for normal operation
-        ili9341.reset.set_high().map_err(Error::OutputPin)?;
+        ili9341
+            .reset
+            .set_high()
+            .map_err(|_| DisplayError::RSError)?;
 
         // Wait 5ms after reset before sending commands
         // and 120ms before sending Sleep Out
@@ -130,23 +129,17 @@ where
         Ok(ili9341)
     }
 
-    fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), Error<PinE>> {
-        self.interface
-            .send_commands(U8Iter(&mut once(cmd as u8)))
-            .map_err(|_| Error::Interface)?;
-        self.interface
-            .send_data(U8Iter(&mut args.iter().cloned()))
-            .map_err(|_| Error::Interface)
+    fn command(&mut self, cmd: Command, args: &[u8]) -> Result<(), DisplayError> {
+        self.interface.send_commands(U8Iter(&mut once(cmd as u8)))?;
+        self.interface.send_data(U8Iter(&mut args.iter().cloned()))
     }
 
-    fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result<(), Error<PinE>> {
+    fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result<(), DisplayError> {
         self.command(Command::MemoryWrite, &[])?;
-        self.interface
-            .send_data(U16BEIter(&mut data.into_iter()))
-            .map_err(|_| Error::Interface)
+        self.interface.send_data(U16BEIter(&mut data.into_iter()))
     }
 
-    fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result<(), Error<PinE>> {
+    fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result<(), DisplayError> {
         self.command(
             Command::ColumnAddressSet,
             &[
@@ -164,8 +157,7 @@ where
                 (y1 >> 8) as u8,
                 (y1 & 0xff) as u8,
             ],
-        )?;
-        Ok(())
+        )
     }
 
     /// Configures the screen for hardware-accelerated vertical scrolling.
@@ -173,7 +165,7 @@ where
         &mut self,
         fixed_top_lines: u16,
         fixed_bottom_lines: u16,
-    ) -> Result<Scroller, Error<PinE>> {
+    ) -> Result<Scroller, DisplayError> {
         let height = match self.mode {
             Orientation::Landscape | Orientation::LandscapeFlipped => self.width,
             Orientation::Portrait | Orientation::PortraitFlipped => self.height,
@@ -199,7 +191,7 @@ where
         &mut self,
         scroller: &mut Scroller,
         num_lines: u16,
-    ) -> Result<(), Error<PinE>> {
+    ) -> Result<(), DisplayError> {
         scroller.top_offset += num_lines;
         if scroller.top_offset > (scroller.height - scroller.fixed_bottom_lines) {
             scroller.top_offset = scroller.fixed_top_lines
@@ -231,7 +223,7 @@ where
         x1: u16,
         y1: u16,
         data: I,
-    ) -> Result<(), Error<PinE>> {
+    ) -> Result<(), DisplayError> {
         self.set_window(x0, y0, x1, y1)?;
         self.write_iter(data)
     }
@@ -252,13 +244,13 @@ where
         x1: u16,
         y1: u16,
         data: &[u16],
-    ) -> Result<(), Error<PinE>> {
+    ) -> Result<(), DisplayError> {
         self.set_window(x0, y0, x1, y1)?;
         self.write_iter(data.iter().cloned())
     }
 
     /// Change the orientation of the screen
-    pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), Error<PinE>> {
+    pub fn set_orientation(&mut self, mode: Orientation) -> Result<(), DisplayError> {
         let was_landscape = match self.mode {
             Orientation::Landscape | Orientation::LandscapeFlipped => true,
             Orientation::Portrait | Orientation::PortraitFlipped => false,

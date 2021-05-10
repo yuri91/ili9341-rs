@@ -1,6 +1,6 @@
 use crate::{Ili9341, OutputPin};
 
-use core::{fmt::Debug, iter};
+use core::iter;
 
 use embedded_graphics::{
     drawable::Pixel,
@@ -14,13 +14,12 @@ use embedded_graphics::{
     DrawTarget,
 };
 
-impl<PinE, IFACE, RESET> DrawTarget<Rgb565> for Ili9341<IFACE, RESET>
+impl<IFACE, RESET> DrawTarget<Rgb565> for Ili9341<IFACE, RESET>
 where
     IFACE: display_interface::WriteOnlyDataCommand,
-    RESET: OutputPin<Error = PinE>,
-    PinE: Debug,
+    RESET: OutputPin,
 {
-    type Error = crate::Error<PinE>;
+    type Error = display_interface::DisplayError;
 
     fn size(&self) -> Size {
         Size::new(self.width as u32, self.height as u32)
