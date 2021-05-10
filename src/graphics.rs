@@ -1,4 +1,4 @@
-use crate::{Ili9341, OutputPin};
+use crate::Ili9341;
 
 use core::iter;
 
@@ -17,7 +17,6 @@ use embedded_graphics::{
 impl<IFACE, RESET> DrawTarget<Rgb565> for Ili9341<IFACE, RESET>
 where
     IFACE: display_interface::WriteOnlyDataCommand,
-    RESET: OutputPin,
 {
     type Error = display_interface::DisplayError;
 

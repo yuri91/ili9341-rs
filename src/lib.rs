@@ -130,7 +130,12 @@ where
 
         Ok(ili9341)
     }
+}
 
+impl<IFACE, RESET> Ili9341<IFACE, RESET>
+where
+    IFACE: WriteOnlyDataCommand,
+{
     fn command(&mut self, cmd: Command, args: &[u8]) -> Result {
         self.interface.send_commands(U8Iter(&mut once(cmd as u8)))?;
         self.interface.send_data(U8Iter(&mut args.iter().cloned()))
@@ -270,7 +275,9 @@ where
         self.mode = mode;
         Ok(())
     }
+}
 
+impl<IFACE, RESET> Ili9341<IFACE, RESET> {
     /// Get the current screen width. It can change based on the current orientation
     pub fn width(&self) -> usize {
         self.width
