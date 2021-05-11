@@ -10,7 +10,7 @@ use core::iter::once;
 use display_interface::DataFormat::{U16BEIter, U8Iter};
 use display_interface::WriteOnlyDataCommand;
 
-pub mod spi;
+pub use embedded_hal::spi::MODE_0 as SPI_MODE;
 
 /// Trait representing the interface to the hardware.
 ///
