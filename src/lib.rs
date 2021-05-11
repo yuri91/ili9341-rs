@@ -12,28 +12,6 @@ use display_interface::WriteOnlyDataCommand;
 
 pub use embedded_hal::spi::MODE_0 as SPI_MODE;
 
-/// Trait representing the interface to the hardware.
-///
-/// Intended to abstract the various buses (SPI, MPU 8/9/16-bit) from the Controller code.
-pub trait Interface {
-    type Error;
-
-    /// Sends a command with a sequence of 8-bit arguments
-    ///
-    /// Mostly used for sending configuration commands
-    fn write(&mut self, command: u8, data: &[u8]) -> Result<(), Self::Error>;
-
-    /// Sends a command with a sequence of 16-bit data words
-    ///
-    /// Mostly used for sending MemoryWrite command and other commands
-    /// with 16-bit arguments
-    fn write_iter(
-        &mut self,
-        command: u8,
-        data: impl IntoIterator<Item = u16>,
-    ) -> Result<(), Self::Error>;
-}
-
 /// Trait that defines display size information
 pub trait DisplaySize {
     /// Width in pixels
