@@ -31,7 +31,7 @@ where
             return Ok(());
         }
 
-        self.draw_raw(
+        self.draw_raw_slice(
             pos.x as u16,
             pos.y as u16,
             pos.x as u16,
@@ -64,7 +64,7 @@ where
         let y0 = clamp(y0, h - 1);
         let x1 = clamp(x1, w - 1);
         let y1 = clamp(y1, h - 1);
-        self.draw_iter(
+        self.draw_raw_iter(
             x0,
             y0,
             x1,
@@ -81,7 +81,7 @@ where
     fn clear(&mut self, color: Rgb565) -> Result<(), Self::Error> {
         let color = RawU16::from(color).into_inner();
 
-        self.draw_iter(
+        self.draw_raw_iter(
             0,
             0,
             (self.width - 1) as u16,
