@@ -40,12 +40,42 @@ impl DisplaySize for DisplaySize320x480 {
     const HEIGHT: usize = 480;
 }
 
-/// The default orientation is Portrait
+/// For quite a few boards (ESP32-S2-Kaluga-1, M5Stack, M5Core2 and others),
+/// the ILI9341 initialization command arguments are slightly different
+///
+/// This trait provides the flexibility for users to define their own
+/// initialization command arguments suitable for the particular board they are using
+pub trait Mode {
+    fn mode(&self) -> u8;
+
+    fn is_landscape(&self) -> bool;
+}
+
+/// The default implementation of the Mode trait from above
+/// Should work for most (but not all) boards
 pub enum Orientation {
     Portrait,
     PortraitFlipped,
     Landscape,
     LandscapeFlipped,
+}
+
+impl Mode for Orientation {
+    fn mode(&self) -> u8 {
+        match self {
+            Self::Portrait => 0x40 | 0x08,
+            Self::Landscape => 0x20 | 0x08,
+            Self::PortraitFlipped => 0x80 | 0x08,
+            Self::LandscapeFlipped => 0x40 | 0x80 | 0x20 | 0x08,
+        }
+    }
+
+    fn is_landscape(&self) -> bool {
+        match self {
+            Self::Landscape | Self::LandscapeFlipped => true,
+            Self::Portrait | Self::PortraitFlipped => false,
+        }
+    }
 }
 
 /// There are two method for drawing to the screen:
@@ -68,7 +98,7 @@ pub struct Ili9341<IFACE, RESET> {
     reset: RESET,
     width: usize,
     height: usize,
-    mode: Orientation,
+    landscape: bool,
 }
 
 impl<IFACE, RESET> Ili9341<IFACE, RESET>
@@ -76,23 +106,24 @@ where
     IFACE: WriteOnlyDataCommand,
     RESET: OutputPin,
 {
-    pub fn new<DELAY, SIZE>(
+    pub fn new<DELAY, SIZE, MODE>(
         interface: IFACE,
         reset: RESET,
         delay: &mut DELAY,
-        mode: Orientation,
+        mode: MODE,
         _display_size: SIZE,
     ) -> Result<Self>
     where
         DELAY: DelayMs<u16>,
         SIZE: DisplaySize,
+        MODE: Mode,
     {
         let mut ili9341 = Ili9341 {
             interface,
             reset,
             width: SIZE::WIDTH,
             height: SIZE::HEIGHT,
-            mode: Orientation::Portrait,
+            landscape: false,
         };
 
         // Do hardware reset by holding reset low for at least 10us
@@ -172,9 +203,10 @@ where
         fixed_top_lines: u16,
         fixed_bottom_lines: u16,
     ) -> Result<Scroller> {
-        let height = match self.mode {
-            Orientation::Landscape | Orientation::LandscapeFlipped => self.width,
-            Orientation::Portrait | Orientation::PortraitFlipped => self.height,
+        let height = if self.landscape {
+            self.width
+        } else {
+            self.height
         } as u16;
         let scroll_lines = height as u16 - fixed_top_lines - fixed_bottom_lines;
 
@@ -244,33 +276,16 @@ where
     }
 
     /// Change the orientation of the screen
-    pub fn set_orientation(&mut self, mode: Orientation) -> Result {
-        let was_landscape = match self.mode {
-            Orientation::Landscape | Orientation::LandscapeFlipped => true,
-            Orientation::Portrait | Orientation::PortraitFlipped => false,
-        };
-        let is_landscape = match mode {
-            Orientation::Portrait => {
-                self.command(Command::MemoryAccessControl, &[0x40 | 0x08])?;
-                false
-            }
-            Orientation::Landscape => {
-                self.command(Command::MemoryAccessControl, &[0x20 | 0x08])?;
-                true
-            }
-            Orientation::PortraitFlipped => {
-                self.command(Command::MemoryAccessControl, &[0x80 | 0x08])?;
-                false
-            }
-            Orientation::LandscapeFlipped => {
-                self.command(Command::MemoryAccessControl, &[0x40 | 0x80 | 0x20 | 0x08])?;
-                true
-            }
-        };
-        if was_landscape ^ is_landscape {
+    pub fn set_orientation<MODE>(&mut self, mode: MODE) -> Result
+    where
+        MODE: Mode,
+    {
+        self.command(Command::MemoryAccessControl, &[mode.mode()])?;
+
+        if self.landscape ^ mode.is_landscape() {
             core::mem::swap(&mut self.height, &mut self.width);
         }
-        self.mode = mode;
+        self.landscape = mode.is_landscape();
         Ok(())
     }
 }
