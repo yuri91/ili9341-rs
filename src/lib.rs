@@ -1,5 +1,30 @@
 #![no_std]
 
+//! ILI9341 Display Driver
+//!
+//! ### Usage
+//!
+//! To control the display you need to set up:
+//!
+//! * Interface for communicating with display ([display-interface-spi crate] for SPI)
+//! * Configuration (reset pin, delay, orientation and size) for display
+//!
+//! ```ignore
+//! let iface = SPIInterface::new(spi, dc, cs);
+//!
+//! let mut display = Ili9341::new(
+//!     iface,
+//!     reset_gpio,
+//!     &mut delay,
+//!     Orientation::Landscape,
+//!     ili9341::DisplaySize240x320,
+//! )
+//! .unwrap();
+//!
+//! display.clear(Rgb565::RED).unwrap()
+//! ```
+//!
+//! [display-interface-spi crate]: https://crates.io/crates/display-interface-spi
 use embedded_hal::blocking::delay::DelayMs;
 use embedded_hal::digital::v2::OutputPin;
 
