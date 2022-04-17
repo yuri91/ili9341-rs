@@ -12,7 +12,7 @@ edition = "2018"
 
 [dependencies]
 display-interface = "0.4.1"
-embedded-hal = "0.2.5"
+embedded-hal = "1.0.0-alpha.7"
 
 [dependencies.embedded-graphics-core]
 optional = true
@@ -22,4 +22,3 @@ version = "0.3"
 [features]
 default = ["graphics"]
 graphics = ["embedded-graphics-core"]
-
