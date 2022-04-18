@@ -1,5 +1,4 @@
 use crate::Ili9341;
-
 use embedded_graphics_core::{
     pixelcolor::{raw::RawU16, Rgb565},
     prelude::*,
@@ -81,5 +80,9 @@ where
             // No pixels are on screen
             Ok(())
         }
+    }
+
+    fn clear(&mut self, color: Self::Color) -> Result<(), Self::Error> {
+        self.clear_screen(RawU16::from(color).into_inner())
     }
 }
