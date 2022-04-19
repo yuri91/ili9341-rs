@@ -313,6 +313,12 @@ where
         self.landscape = mode.is_landscape();
         Ok(())
     }
+
+    /// Fill entire screen with specfied color u16 value
+    pub fn clear_screen(&mut self, color: u16) -> Result {
+        let color = core::iter::repeat(color).take(self.width * self.height);
+        self.draw_raw_iter(0, 0, self.width as u16, self.height as u16, color)
+    }
 }
 
 impl<IFACE, RESET> Ili9341<IFACE, RESET> {
