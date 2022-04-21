@@ -103,6 +103,12 @@ impl Mode for Orientation {
     }
 }
 
+/// Specify state of specific mode of operation
+pub enum ModeState {
+    On,
+    Off,
+}
+
 /// There are two method for drawing to the screen:
 /// [Ili9341::draw_raw_iter] and [Ili9341::draw_raw_slice]
 ///
@@ -176,12 +182,12 @@ where
         // Set pixel format to 16 bits per pixel
         ili9341.command(Command::PixelFormatSet, &[0x55])?;
 
-        ili9341.command(Command::SleepOut, &[])?;
+        ili9341.sleep_mode(ModeState::Off)?;
 
         // Wait 5ms after Sleep Out before sending commands
         let _ = delay.delay_ms(5);
 
-        ili9341.command(Command::DisplayOn, &[])?;
+        ili9341.display_mode(ModeState::On)?;
 
         Ok(ili9341)
     }
@@ -319,6 +325,30 @@ where
         let color = core::iter::repeat(color).take(self.width * self.height);
         self.draw_raw_iter(0, 0, self.width as u16, self.height as u16, color)
     }
+
+    /// Control the screen sleep mode:
+    pub fn sleep_mode(&mut self, mode: ModeState) -> Result {
+        match mode {
+            ModeState::On => self.command(Command::SleepModeOn, &[]),
+            ModeState::Off => self.command(Command::SleepModeOff, &[]),
+        }
+    }
+
+    /// Control the screen display mode:
+    pub fn display_mode(&mut self, mode: ModeState) -> Result {
+        match mode {
+            ModeState::On => self.command(Command::DisplayOn, &[]),
+            ModeState::Off => self.command(Command::DisplayOff, &[]),
+        }
+    }
+
+    /// Invert the pixel color ion screen:
+    pub fn invert_mode(&mut self, mode: ModeState) -> Result {
+        match mode {
+            ModeState::On => self.command(Command::InvertOn, &[]),
+            ModeState::Off => self.command(Command::InvertOff, &[]),
+        }
+    }
 }
 
 impl<IFACE, RESET> Ili9341<IFACE, RESET> {
@@ -358,7 +388,11 @@ enum Command {
     SoftwareReset = 0x01,
     MemoryAccessControl = 0x36,
     PixelFormatSet = 0x3a,
-    SleepOut = 0x11,
+    SleepModeOn = 0x10,
+    SleepModeOff = 0x11,
+    InvertOff = 0x20,
+    InvertOn = 0x21,
+    DisplayOff = 0x28,
     DisplayOn = 0x29,
     ColumnAddressSet = 0x2a,
     PageAddressSet = 0x2b,
