@@ -334,7 +334,7 @@ where
         }
     }
 
-    /// Control the screen display mode:
+    /// Control the screen display mode
     pub fn display_mode(&mut self, mode: ModeState) -> Result {
         match mode {
             ModeState::On => self.command(Command::DisplayOn, &[]),
@@ -342,12 +342,51 @@ where
         }
     }
 
-    /// Invert the pixel color ion screen:
+    /// Invert the pixel color on screen
     pub fn invert_mode(&mut self, mode: ModeState) -> Result {
         match mode {
             ModeState::On => self.command(Command::InvertOn, &[]),
             ModeState::Off => self.command(Command::InvertOff, &[]),
         }
+    }
+
+    /// Idle mode reduces the number of colors to 8
+    pub fn idle_mode(&mut self, mode: ModeState) -> Result {
+        match mode {
+            ModeState::On => self.command(Command::IdleModeOn, &[]),
+            ModeState::Off => self.command(Command::IdleModeOff, &[]),
+        }
+    }
+
+    /// Set display brightness to the value between 0 and 255
+    pub fn brightness(&mut self, brightness: u8) -> Result {
+        self.command(Command::SetBrightness, &[brightness])
+    }
+
+    /// Set adaptive brightness value equal to [AdaptiveBrightness]
+    pub fn content_adaptive_brightness(&mut self, value: AdaptiveBrightness) -> Result {
+        self.command(Command::ContentAdaptiveBrightness, &[value as _])
+    }
+
+    /// Configure [FrameRateClockDivision] and [FrameRate] in normal mode
+    pub fn normal_mode_frame_rate(
+        &mut self,
+        clk_div: FrameRateClockDivision,
+        frame_rate: FrameRate,
+    ) -> Result {
+        self.command(
+            Command::NormalModeFrameRate,
+            &[clk_div as _, frame_rate as _],
+        )
+    }
+
+    /// Configure [FrameRateClockDivision] and [FrameRate] in idle mode
+    pub fn idle_mode_frame_rate(
+        &mut self,
+        clk_div: FrameRateClockDivision,
+        frame_rate: FrameRate,
+    ) -> Result {
+        self.command(Command::IdleModeFrameRate, &[clk_div as _, frame_rate as _])
     }
 }
 
@@ -383,6 +422,42 @@ impl Scroller {
     }
 }
 
+/// Available Adaptive Brightness values
+pub enum AdaptiveBrightness {
+    Off = 0x00,
+    UserInterfaceImage = 0x01,
+    StillPicture = 0x02,
+    MovingImage = 0x03,
+}
+
+/// Available frame rate in Hz
+pub enum FrameRate {
+    FrameRate119 = 0x10,
+    FrameRate112 = 0x11,
+    FrameRate106 = 0x12,
+    FrameRate100 = 0x13,
+    FrameRate95 = 0x14,
+    FrameRate90 = 0x15,
+    FrameRate86 = 0x16,
+    FrameRate83 = 0x17,
+    FrameRate79 = 0x18,
+    FrameRate76 = 0x19,
+    FrameRate73 = 0x1a,
+    FrameRate70 = 0x1b,
+    FrameRate68 = 0x1c,
+    FrameRate65 = 0x1d,
+    FrameRate63 = 0x1e,
+    FrameRate61 = 0x1f,
+}
+
+/// Frame rate clock division
+pub enum FrameRateClockDivision {
+    Fosc = 0x00,
+    FoscDiv2 = 0x01,
+    FoscDiv4 = 0x02,
+    FoscDiv8 = 0x03,
+}
+
 #[derive(Clone, Copy)]
 enum Command {
     SoftwareReset = 0x01,
@@ -399,4 +474,10 @@ enum Command {
     MemoryWrite = 0x2c,
     VerticalScrollDefine = 0x33,
     VerticalScrollAddr = 0x37,
+    IdleModeOff = 0x38,
+    IdleModeOn = 0x39,
+    SetBrightness = 0x51,
+    ContentAdaptiveBrightness = 0x55,
+    NormalModeFrameRate = 0xb1,
+    IdleModeFrameRate = 0xb2,
 }
