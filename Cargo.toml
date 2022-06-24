@@ -1,3 +1,5 @@
+# Copyright 2022 Arm Limited and/or its affiliates <open-source-office@arm.com>
+
 [package]
 name = "ili9341"
 version = "0.5.0"
@@ -12,7 +14,7 @@ edition = "2018"
 
 [dependencies]
 display-interface = "0.4.1"
-embedded-hal = "1.0.0-alpha.7"
+embedded-hal = "1.0.0-alpha.8"
 
 [dependencies.embedded-graphics-core]
 optional = true
