@@ -1,5 +1,9 @@
 # `ili9341`
 
+[![Crates.io](https://img.shields.io/crates/d/ili9341.svg)](https://crates.io/crates/ili9341)
+[![Crates.io](https://img.shields.io/crates/v/ili9341.svg)](https://crates.io/crates/ili9341)
+[![Released API docs](https://docs.rs/ili9341/badge.svg)](https://docs.rs/ili9341)
+
 > A platform agnostic driver to interface with the ILI9341 (and ILI9340C) TFT
 > LCD display
 
