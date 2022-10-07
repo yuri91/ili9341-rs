@@ -25,8 +25,8 @@
 //! ```
 //!
 //! [display-interface-spi crate]: https://crates.io/crates/display-interface-spi
-use embedded_hal::delay::blocking::DelayUs;
-use embedded_hal::digital::blocking::OutputPin;
+use embedded_hal::delay::DelayUs;
+use embedded_hal::digital::OutputPin;
 
 use core::iter::once;
 use display_interface::DataFormat::{U16BEIter, U8Iter};
