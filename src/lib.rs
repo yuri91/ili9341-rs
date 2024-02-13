@@ -25,7 +25,7 @@
 //! ```
 //!
 //! [display-interface-spi crate]: https://crates.io/crates/display-interface-spi
-use embedded_hal::delay::DelayUs;
+use embedded_hal::delay::DelayNs;
 use embedded_hal::digital::OutputPin;
 
 use core::iter::once;
@@ -145,7 +145,7 @@ where
         _display_size: SIZE,
     ) -> Result<Self>
     where
-        DELAY: DelayUs,
+        DELAY: DelayNs,
         SIZE: DisplaySize,
         MODE: Mode,
     {

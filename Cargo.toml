@@ -2,7 +2,7 @@
 
 [package]
 name = "ili9341"
-version = "0.5.0"
+version = "0.5.1"
 description = "A platform agnostic driver to interface with the ILI9341 (ald ILI9340C) TFT LCD display"
 authors = ["Yuri Iozzelli <y.iozzelli@gmail.com>"]
 categories = ["embedded", "hardware-support", "no-std"]
@@ -13,12 +13,12 @@ edition = "2018"
 
 
 [dependencies]
-display-interface = "0.4.1"
-embedded-hal = "1.0.0-alpha.9"
+display-interface = "0.5"
+embedded-hal = "1.0.0"
 
 [dependencies.embedded-graphics-core]
 optional = true
-version = "0.3"
+version = "0.4"
 
 [dev-dependencies]
 cortex-m-rtic = "1.0.0"
