@@ -27,14 +27,8 @@ where
             if self.bounding_box().contains(point) {
                 let x = point.x as u16;
                 let y = point.y as u16;
-
-                self.draw_raw_iter(
-                    x,
-                    y,
-                    x,
-                    y,
-                    core::iter::once(RawU16::from(color).into_inner()),
-                )?;
+                let color = RawU16::from(color).into_inner();
+                self.draw_raw_slice(x, y, x, y, &[color])?;
             }
         }
         Ok(())

@@ -28,8 +28,7 @@
 use embedded_hal::delay::DelayNs;
 use embedded_hal::digital::OutputPin;
 
-use core::iter::once;
-use display_interface::DataFormat::{U16BEIter, U8Iter};
+use display_interface::DataFormat;
 use display_interface::WriteOnlyDataCommand;
 
 #[cfg(feature = "graphics")]
@@ -198,13 +197,19 @@ where
     IFACE: WriteOnlyDataCommand,
 {
     fn command(&mut self, cmd: Command, args: &[u8]) -> Result {
-        self.interface.send_commands(U8Iter(&mut once(cmd as u8)))?;
-        self.interface.send_data(U8Iter(&mut args.iter().cloned()))
+        self.interface.send_commands(DataFormat::U8(&[cmd as u8]))?;
+        self.interface.send_data(DataFormat::U8(args))
     }
 
     fn write_iter<I: IntoIterator<Item = u16>>(&mut self, data: I) -> Result {
         self.command(Command::MemoryWrite, &[])?;
+        use DataFormat::U16BEIter;
         self.interface.send_data(U16BEIter(&mut data.into_iter()))
+    }
+
+    fn write_slice(&mut self, data: &[u16]) -> Result {
+        self.command(Command::MemoryWrite, &[])?;
+        self.interface.send_data(DataFormat::U16(data))
     }
 
     fn set_window(&mut self, x0: u16, y0: u16, x1: u16, y1: u16) -> Result {
@@ -303,7 +308,8 @@ where
     ///
     /// The expected format is rgb565.
     pub fn draw_raw_slice(&mut self, x0: u16, y0: u16, x1: u16, y1: u16, data: &[u16]) -> Result {
-        self.draw_raw_iter(x0, y0, x1, y1, data.iter().copied())
+        self.set_window(x0, y0, x1, y1)?;
+        self.write_slice(data)
     }
 
     /// Change the orientation of the screen
