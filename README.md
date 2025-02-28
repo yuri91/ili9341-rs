@@ -23,6 +23,7 @@
 
 ## Examples
 
+- [ESP32-C6](./examples/esp32c6/main.rs)
 SOON
 
 ## License
