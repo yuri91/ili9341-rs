@@ -24,6 +24,7 @@
 ## Examples
 
 - [ESP32-C6](./examples/esp32c6/main.rs)
+- [Raspberry Pi Pico](./examples/rppico/main.rs)
 SOON
 
 ## License
