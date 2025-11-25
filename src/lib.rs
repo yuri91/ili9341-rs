@@ -87,6 +87,8 @@ pub enum Orientation {
 impl Mode for Orientation {
     fn mode(&self) -> u8 {
         match self {
+            Slef::Normal => 0x00,
+            Self::NormalGBR => 0x08,
             Self::Portrait => 0x40 | 0x08,
             Self::Landscape => 0x20 | 0x08,
             Self::PortraitFlipped => 0x80 | 0x08,
