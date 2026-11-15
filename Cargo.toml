@@ -33,6 +33,7 @@ features = ["stm32f411"]
 
 [features]
 default = ["graphics"]
+defmt = ["display-interface/defmt-03"]
 graphics = ["embedded-graphics-core"]
 
 [[example]]
